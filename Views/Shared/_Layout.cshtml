@@ -4,6 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - COW.AI</title>
+    <meta name="description" content="COW.AI - Nền tảng trợ lý AI đa tác vụ hàng đầu: Trò chuyện thông minh, sáng tạo hình ảnh, tóm tắt tài liệu văn bản và hỗ trợ lập trình viết code AI tốc độ cao." />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0b1120" />
+    <meta property="og:title" content="@ViewData["Title"] - COW.AI Trợ lý AI Đa Năng" />
+    <meta property="og:description" content="Trò chuyện AI, sinh hình ảnh, tóm tắt văn bản và hỗ trợ lập trình thông minh." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/png" href="~/images/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -41,10 +48,11 @@
     <canvas id="three-canvas"></canvas>
 
     <div class="app-wrapper">
-        <header class="navbar-glass">
+        <a href="#main-content" class="skip-to-content-link">Chuyển đến nội dung chính</a>
+        <header class="navbar-glass" role="banner" itemscope itemtype="https://schema.org/WPHeader">
             <div class="navbar-container">
                 <div class="navbar-brand-group">
-                    <button type="button" id="toggleHistoryDrawerBtn" class="nav-drawer-toggle" aria-label="Mở lịch sử trò chuyện" title="Lịch sử chat">
+                    <button type="button" id="toggleHistoryDrawerBtn" class="nav-drawer-toggle" aria-label="Mở lịch sử trò chuyện" title="Lịch sử chat" aria-expanded="false" aria-controls="chatHistoryDrawer">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="3" y1="12" x2="21" y2="12"></line>
                             <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -52,36 +60,115 @@
                         </svg>
                     </button>
                     <div class="navbar-brand">
-                        <a asp-controller="Home" asp-action="Index" class="brand-logo gradient-text">
-                            <img src="~/images/logo.png" alt="Logo COW.AI" class="brand-logo__image" />
-                            <span>COW.AI</span>
+                        <a asp-controller="Home" asp-action="Index" class="brand-logo gradient-text" rel="home" title="COW.AI - Trợ lý AI Thông minh & Đa tác vụ">
+                            <img src="~/images/logo.png" alt="Logo COW.AI" class="brand-logo__image" width="32" height="32" loading="eager" />
+                            <span class="brand-name">COW.AI</span>
                         </a>
                     </div>
                 </div>
 
-                <nav class="navbar-nav">
-                    <a asp-controller="Home" asp-action="Index" class="nav-link">Trang chủ</a>
-                    <a asp-controller="Image" asp-action="Index" class="nav-link">Tạo ảnh</a>
-                    <a asp-controller="Document" asp-action="Summary" class="nav-link">Tóm tắt</a>
-                    <a asp-controller="Document" asp-action="CodeGen" class="nav-link">Viết code</a>
+                <!-- Desktop Navigation Menu (Semantic & Chuẩn SEO Schema.org) -->
+                <nav class="navbar-nav desktop-nav" aria-label="Điều hướng chính" role="navigation" itemscope itemtype="https://schema.org/SiteNavigationElement">
+                    <ul class="nav-menu-list" role="menubar">
+                        <li class="nav-menu-item" role="none">
+                            <a asp-controller="Home" asp-action="Index" class="nav-link" itemprop="url" title="Trang chủ COW.AI - Trò chuyện và trợ lý trực tuyến">
+                                <span itemprop="name">Trang chủ</span>
+                            </a>
+                        </li>
+                        <li class="nav-menu-item" role="none">
+                            <a asp-controller="Image" asp-action="Index" class="nav-link" itemprop="url" title="Tạo ảnh nghệ thuật và tranh vẽ bằng AI">
+                                <span itemprop="name">Tạo ảnh</span>
+                            </a>
+                        </li>
+                        <li class="nav-menu-item" role="none">
+                            <a asp-controller="Document" asp-action="Summary" class="nav-link" itemprop="url" title="Tóm tắt tài liệu và phân tích văn bản nhanh chóng">
+                                <span itemprop="name">Tóm tắt</span>
+                            </a>
+                        </li>
+                        <li class="nav-menu-item" role="none">
+                            <a asp-controller="Document" asp-action="CodeGen" class="nav-link" itemprop="url" title="Viết code và sinh thuật toán bằng AI">
+                                <span itemprop="name">Viết code</span>
+                            </a>
+                        </li>
+                    </ul>
                 </nav>
 
-                <div class="theme-switcher">
-                    <button id="themeToggleBtn" class="theme-btn" type="button" aria-label="Chuyển đổi giao diện">
-                        <svg class="icon-theme" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                <!-- Navbar Actions: Theme Switcher & Mobile Menu Toggle -->
+                <div class="navbar-actions">
+                    <div class="theme-switcher">
+                        <button id="themeToggleBtn" class="theme-btn" type="button" aria-label="Chuyển đổi giao diện Sáng / Tối" title="Đổi giao diện">
+                            <svg class="icon-theme" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                            </svg>
+                        </button>
+                        <div id="themeDropdownMenu" class="theme-dropdown glass-panel">
+                            <button type="button" class="theme-option active" data-theme="dark">Dark</button>
+                            <button type="button" class="theme-option" data-theme="light">Light</button>
+                            <button type="button" class="theme-option" data-theme="system">System</button>
+                        </div>
+                    </div>
+
+                    <!-- Mobile Navigation Toggle Button (Hiện khi màn hình <= 768px) -->
+                    <button type="button" id="mobileNavToggleBtn" class="mobile-nav-toggle" aria-label="Mở menu điều hướng tính năng" aria-expanded="false" aria-controls="mobileNavMenu" title="Menu tính năng">
+                        <svg class="icon-menu-hamburger" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="4" y1="7" x2="20" y2="7"></line>
+                            <line x1="4" y1="12" x2="20" y2="12"></line>
+                            <line x1="4" y1="17" x2="20" y2="17"></line>
+                        </svg>
+                        <svg class="icon-menu-close hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
                     </button>
-                    <div id="themeDropdownMenu" class="theme-dropdown glass-panel">
-                        <button type="button" class="theme-option active" data-theme="dark">Dark</button>
-                        <button type="button" class="theme-option" data-theme="light">Light</button>
-                        <button type="button" class="theme-option" data-theme="system">System</button>
-                    </div>
                 </div>
+            </div>
+
+            <!-- Mobile Navigation Menu (Collapsible Glass Dropdown) -->
+            <div id="mobileNavMenu" class="mobile-nav-menu" aria-label="Menu điều hướng di động" aria-hidden="true">
+                <nav class="mobile-nav-container" role="navigation" itemscope itemtype="https://schema.org/SiteNavigationElement">
+                    <ul class="mobile-nav-list" role="menu">
+                        <li role="none">
+                            <a asp-controller="Home" asp-action="Index" class="mobile-nav-item" itemprop="url" title="Trang chủ COW.AI">
+                                <span class="mobile-nav-icon">💬</span>
+                                <div class="mobile-nav-info">
+                                    <span class="mobile-nav-title" itemprop="name">Trang chủ</span>
+                                    <span class="mobile-nav-desc">Trò chuyện đa năng với AI</span>
+                                </div>
+                            </a>
+                        </li>
+                        <li role="none">
+                            <a asp-controller="Image" asp-action="Index" class="mobile-nav-item" itemprop="url" title="Tạo ảnh AI">
+                                <span class="mobile-nav-icon">🎨</span>
+                                <div class="mobile-nav-info">
+                                    <span class="mobile-nav-title" itemprop="name">Tạo ảnh</span>
+                                    <span class="mobile-nav-desc">Sáng tạo hình ảnh từ văn bản</span>
+                                </div>
+                            </a>
+                        </li>
+                        <li role="none">
+                            <a asp-controller="Document" asp-action="Summary" class="mobile-nav-item" itemprop="url" title="Tóm tắt tài liệu">
+                                <span class="mobile-nav-icon">📄</span>
+                                <div class="mobile-nav-info">
+                                    <span class="mobile-nav-title" itemprop="name">Tóm tắt</span>
+                                    <span class="mobile-nav-desc">Trích xuất ý chính tài liệu</span>
+                                </div>
+                            </a>
+                        </li>
+                        <li role="none">
+                            <a asp-controller="Document" asp-action="CodeGen" class="mobile-nav-item" itemprop="url" title="Viết code AI">
+                                <span class="mobile-nav-icon">💻</span>
+                                <div class="mobile-nav-info">
+                                    <span class="mobile-nav-title" itemprop="name">Viết code</span>
+                                    <span class="mobile-nav-desc">Sinh mã nguồn & thuật toán</span>
+                                </div>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
             </div>
         </header>
 
-        <main role="main" class="main-content">
+        <main id="main-content" role="main" class="main-content">
             @RenderBody()
         </main>
 

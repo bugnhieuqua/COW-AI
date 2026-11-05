@@ -107,9 +107,93 @@
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initThemeSwitcher);
-  } else {
+  function initMobileNav() {
+    const toggleBtn = document.getElementById('mobileNavToggleBtn');
+    const mobileMenu = document.getElementById('mobileNavMenu');
+    const drawerToggleBtn = document.getElementById('toggleHistoryDrawerBtn');
+
+    if (!toggleBtn || !mobileMenu) {
+      return;
+    }
+
+    const iconHamburger = toggleBtn.querySelector('.icon-menu-hamburger');
+    const iconClose = toggleBtn.querySelector('.icon-menu-close');
+
+    function setMenuOpen(open) {
+      if (open) {
+        mobileMenu.classList.add('active');
+        mobileMenu.setAttribute('aria-hidden', 'false');
+        toggleBtn.setAttribute('aria-expanded', 'true');
+        toggleBtn.setAttribute('aria-label', 'Đóng menu điều hướng tính năng');
+        if (iconHamburger) iconHamburger.classList.add('hidden');
+        if (iconClose) iconClose.classList.remove('hidden');
+
+        // Đóng theme dropdown nếu đang mở
+        const themeDropdown = document.getElementById('themeDropdownMenu');
+        if (themeDropdown) themeDropdown.classList.remove('active');
+      } else {
+        mobileMenu.classList.remove('active');
+        mobileMenu.setAttribute('aria-hidden', 'true');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.setAttribute('aria-label', 'Mở menu điều hướng tính năng');
+        if (iconHamburger) iconHamburger.classList.remove('hidden');
+        if (iconClose) iconClose.classList.add('hidden');
+      }
+    }
+
+    toggleBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const isOpen = mobileMenu.classList.contains('active');
+      setMenuOpen(!isOpen);
+    });
+
+    // Đóng khi click bất kỳ link nào trong mobile menu
+    mobileMenu.querySelectorAll('a').forEach(function (link) {
+      link.addEventListener('click', function () {
+        setMenuOpen(false);
+      });
+    });
+
+    // Đóng khi click ra ngoài
+    document.addEventListener('click', function (e) {
+      if (!mobileMenu.contains(e.target) && !toggleBtn.contains(e.target)) {
+        if (mobileMenu.classList.contains('active')) {
+          setMenuOpen(false);
+        }
+      }
+    });
+
+    // Đóng khi bấm phím Escape
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && mobileMenu.classList.contains('active')) {
+        setMenuOpen(false);
+        toggleBtn.focus();
+      }
+    });
+
+    // Tự động đóng mobile nav nếu người dùng mở sidebar chat
+    if (drawerToggleBtn) {
+      drawerToggleBtn.addEventListener('click', function () {
+        setMenuOpen(false);
+      });
+    }
+
+    // Đóng khi resize màn hình rộng ra desktop (> 768px)
+    window.addEventListener('resize', function () {
+      if (window.innerWidth > 768 && mobileMenu.classList.contains('active')) {
+        setMenuOpen(false);
+      }
+    });
+  }
+
+  function initApp() {
     initThemeSwitcher();
+    initMobileNav();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+  } else {
+    initApp();
   }
 })();
