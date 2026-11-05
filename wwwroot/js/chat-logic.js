@@ -311,6 +311,145 @@
     }
   }
 
+
+  function renderAudioPlayer(aiBubble, audioUrl, promptText, voiceName, scrollCallback) {
+    aiBubble.innerHTML = '';
+
+    const card = document.createElement('div');
+    card.className = 'ai-tts-card';
+
+    const voiceLabel = (voiceName && voiceName.includes('NamMinh')) ? 'Giọng Nam' : 'Giọng Nữ';
+
+    const header = document.createElement('div');
+    header.className = 'ai-tts-card__header';
+    header.innerHTML = `
+      <div class="ai-tts-card__title">
+        <span class="ai-tts-card__icon">🎙️</span>
+        <span>Bản ghi âm (${voiceLabel})</span>
+      </div>
+      <span class="ai-tts-status-badge status-playing">Đang phát...</span>
+    `;
+
+    const promptDiv = document.createElement('div');
+    promptDiv.className = 'ai-tts-card__prompt';
+    promptDiv.textContent = promptText;
+
+    const audio = new Audio(audioUrl);
+    currentAudio = audio;
+
+    const actions = document.createElement('div');
+    actions.className = 'ai-tts-card__actions';
+
+    const playBtn = document.createElement('button');
+    playBtn.type = 'button';
+    playBtn.className = 'ai-tts-btn btn-play-audio playing';
+    playBtn.innerHTML = `
+      <svg class="icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+      <svg class="icon-play hidden" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+      <span class="btn-play-text">Tạm dừng</span>
+    `;
+
+    const downloadLink = document.createElement('a');
+    downloadLink.href = audioUrl;
+    downloadLink.download = `cow-ai-audio-${Date.now()}.mp3`;
+    downloadLink.className = 'ai-tts-btn btn-download-audio';
+    downloadLink.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      <span>Tải xuống MP3</span>
+    `;
+
+    const statusBadge = header.querySelector('.ai-tts-status-badge');
+    const iconPause = playBtn.querySelector('.icon-pause');
+    const iconPlay = playBtn.querySelector('.icon-play');
+    const btnPlayText = playBtn.querySelector('.btn-play-text');
+
+    playBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (!audio.paused) {
+        audio.pause();
+      } else {
+        stopSpeaking();
+        currentAudio = audio;
+        audio.play().catch(function (err) {
+          console.warn('[AudioPlayer] Lỗi phát lại:', err);
+        });
+      }
+    });
+
+    audio.onplaying = function () {
+      currentAudio = audio;
+      if (statusBadge) {
+        statusBadge.textContent = 'Đang phát...';
+        statusBadge.className = 'ai-tts-status-badge status-playing';
+      }
+      if (iconPause) iconPause.classList.remove('hidden');
+      if (iconPlay) iconPlay.classList.add('hidden');
+      if (btnPlayText) btnPlayText.textContent = 'Tạm dừng';
+      playBtn.classList.add('playing');
+      if (typeof scrollCallback === 'function') scrollCallback();
+    };
+
+    audio.onpause = function () {
+      if (statusBadge) {
+        statusBadge.textContent = 'Tạm dừng';
+        statusBadge.className = 'ai-tts-status-badge';
+      }
+      if (iconPause) iconPause.classList.add('hidden');
+      if (iconPlay) iconPlay.classList.remove('hidden');
+      if (btnPlayText) btnPlayText.textContent = 'Tiếp tục';
+      playBtn.classList.remove('playing');
+    };
+
+    audio.onended = function () {
+      currentAudio = null;
+      if (statusBadge) {
+        statusBadge.textContent = 'Đã phát xong';
+        statusBadge.className = 'ai-tts-status-badge status-done';
+      }
+      if (iconPause) iconPause.classList.add('hidden');
+      if (iconPlay) iconPlay.classList.remove('hidden');
+      if (btnPlayText) btnPlayText.textContent = 'Nghe lại';
+      playBtn.classList.remove('playing');
+      if (typeof scrollCallback === 'function') scrollCallback();
+    };
+
+    audio.onerror = function () {
+      currentAudio = null;
+      if (statusBadge) {
+        statusBadge.textContent = 'Lỗi phát âm thanh';
+        statusBadge.className = 'ai-tts-status-badge status-error';
+      }
+      if (btnPlayText) btnPlayText.textContent = 'Thử lại';
+      playBtn.classList.remove('playing');
+    };
+
+    actions.appendChild(playBtn);
+    actions.appendChild(downloadLink);
+
+    card.appendChild(header);
+    card.appendChild(promptDiv);
+    card.appendChild(actions);
+    aiBubble.appendChild(card);
+
+    if (typeof scrollCallback === 'function') {
+      scrollCallback();
+    }
+
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(function () {
+        if (statusBadge) {
+          statusBadge.textContent = 'Bấm để nghe';
+          statusBadge.className = 'ai-tts-status-badge';
+        }
+        if (iconPause) iconPause.classList.add('hidden');
+        if (iconPlay) iconPlay.classList.remove('hidden');
+        if (btnPlayText) btnPlayText.textContent = 'Phát âm thanh';
+        playBtn.classList.remove('playing');
+      });
+    }
+  }
+
   async function startChat(customPrompt) {
     const promptInput = document.getElementById('promptInput') || document.getElementById('userPromptInput');
     const submitBtn = document.getElementById('submitBtn');
@@ -423,7 +562,7 @@
 
     // 5. Xác định model đã chọn (Edge TTS hoặc model AI)
 
-    // 5.1. Edge TTS: phát trực tiếp file MP3 trả về thay vì đọc luồng văn bản
+    // 5.1. Edge TTS: phát trực tiếp file MP3 trả về kèm nút Play/Pause và Tải xuống MP3
     if (selectedModel === 'edge-male' || selectedModel === 'edge-female') {
       const voiceName = selectedModel === 'edge-male' ? 'vi-VN-NamMinhNeural' : 'vi-VN-HoaiMyNeural';
       if (document.body) {
@@ -445,43 +584,18 @@
         return;
       }
 
-      if (aiBubble) {
-        aiBubble.innerHTML = '<div class="ai-tts-status"><span class="ai-tts-status__icon" aria-hidden="true">🔊</span> Đang tạo âm thanh...</div>';
-      }
-
       const audioUrl = '/Home/StreamChat?prompt=' + encodeURIComponent(prompt) +
         '&model=' + encodeURIComponent(selectedModel);
-      const audio = new Audio(audioUrl);
-      currentAudio = audio;
 
-      function handleTtsError() {
-        currentAudio = null;
-        if (aiBubble) {
-          aiBubble.innerHTML = '<div class="ai-alert-error">⚠️ Không thể phát âm thanh. Vui lòng thử lại sau ít phút.</div>';
-          scrollToBottom();
-        }
+      if (aiBubble) {
+        renderAudioPlayer(aiBubble, audioUrl, prompt, voiceName, scrollToBottom);
       }
 
-      audio.onplaying = function () {
-        if (aiBubble) {
-          aiBubble.innerHTML = '<div class="ai-tts-status ai-tts-status--playing"><span class="ai-tts-status__icon" aria-hidden="true">🔊</span> Đang phát âm thanh...</div>';
-          scrollToBottom();
+      if (window.CowAiHistoryStore) {
+        window.CowAiHistoryStore.addMessage('assistant', '[Bản ghi âm giọng đọc: "' + prompt + '"]', selectedModel);
+        if (typeof window.renderSessionList === 'function') {
+          window.renderSessionList();
         }
-      };
-
-      audio.onended = function () {
-        currentAudio = null;
-        if (aiBubble) {
-          aiBubble.innerHTML = '<div class="ai-tts-status ai-tts-status--done"><span class="ai-tts-status__icon" aria-hidden="true">🔊</span> Đã phát xong âm thanh.</div>';
-          scrollToBottom();
-        }
-      };
-
-      audio.onerror = handleTtsError;
-
-      const playResult = audio.play();
-      if (playResult && typeof playResult.catch === 'function') {
-        playResult.catch(handleTtsError);
       }
 
       if (promptInput) {

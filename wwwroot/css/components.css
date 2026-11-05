@@ -1181,3 +1181,124 @@ body.light .ai-alert-error {
 .attachment-chip__remove:hover {
   color: #ef4444;
 }
+
+
+/* ==========================================================================
+   Edge TTS Player Card (Play/Pause & Download MP3)
+   ========================================================================== */
+.ai-tts-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  min-width: 260px;
+  max-width: 440px;
+}
+
+.ai-tts-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ai-tts-card__title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cow-text, #f8fafc);
+}
+
+.ai-tts-card__icon {
+  font-size: 1.1rem;
+}
+
+.ai-tts-status-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--cow-text-muted, #94a3b8);
+  transition: all 0.2s ease;
+}
+
+.ai-tts-status-badge.status-playing {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--cow-accent, #38bdf8);
+}
+
+.ai-tts-status-badge.status-done {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.ai-tts-status-badge.status-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.ai-tts-card__prompt {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--cow-text-muted, #94a3b8);
+  line-height: 1.4;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border-left: 2px solid var(--cow-accent, #38bdf8);
+}
+
+.ai-tts-card__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.ai-tts-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.5rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.btn-play-audio {
+  background: linear-gradient(135deg, var(--cow-gradient-start, #38bdf8), var(--cow-gradient-end, #818cf8));
+  color: #fff;
+  border: none;
+}
+
+.btn-play-audio:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.btn-play-audio.playing {
+  background: rgba(56, 189, 248, 0.2);
+  color: var(--cow-accent, #38bdf8);
+  border: 1px solid var(--cow-accent, #38bdf8);
+}
+
+.btn-download-audio {
+  background: var(--cow-glass-hover, rgba(255, 255, 255, 0.08));
+  color: var(--cow-text, #f8fafc);
+  border: 1px solid var(--cow-glass-border, rgba(255, 255, 255, 0.12));
+}
+
+.btn-download-audio:hover {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--cow-accent, #38bdf8);
+  border-color: var(--cow-accent, #38bdf8);
+  transform: translateY(-1px);
+}

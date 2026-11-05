@@ -38,7 +38,15 @@ public class EdgeTtsService
         foreach (var chunk in SplitIntoChunks(text, MaxChunkLength))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await _client.StreamAsync(chunk, outputStream, voice, cancellationToken);
+            try
+            {
+                await _client.StreamAsync(chunk, outputStream, voice, cancellationToken);
+            }
+            catch (Exception ex) when (ex is System.Net.WebSockets.WebSocketException or System.IO.IOException)
+            {
+                await Task.Delay(200, cancellationToken);
+                await _client.StreamAsync(chunk, outputStream, voice, cancellationToken);
+            }
         }
     }
 
