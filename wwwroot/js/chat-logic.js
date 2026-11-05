@@ -319,6 +319,7 @@
     const heroHeader = document.getElementById('chatHeroHeader');
     const suggestionsGroup = document.getElementById('chatSuggestionsGroup');
     const hiddenSelectedModel = document.getElementById('hiddenSelectedModel') || document.getElementById('modelSelector');
+    const selectedModel = hiddenSelectedModel ? (hiddenSelectedModel.value || 'gemini') : 'gemini';
 
     let rawPrompt = (customPrompt !== undefined && customPrompt !== null && typeof customPrompt === 'string'
       ? customPrompt
@@ -421,7 +422,6 @@
     }
 
     // 5. Xác định model đã chọn (Edge TTS hoặc model AI)
-    const selectedModel = hiddenSelectedModel ? (hiddenSelectedModel.value || 'gemini') : 'gemini';
 
     // 5.1. Edge TTS: phát trực tiếp file MP3 trả về thay vì đọc luồng văn bản
     if (selectedModel === 'edge-male' || selectedModel === 'edge-female') {
