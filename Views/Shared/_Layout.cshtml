@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - COW.AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/pages.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/prism/prism-tomorrow.min.css" asp-append-version="true" />
+    <script>
+        (function () {
+            var theme = localStorage.getItem('cowai_theme') || 'dark';
+            var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            var root = document.documentElement;
+            if (isDark) {
+                root.classList.add('dark');
+                root.classList.remove('light');
+            } else {
+                root.classList.add('light');
+                root.classList.remove('dark');
+            }
+        })();
+    </script>
+</head>
+<body data-tts-voice="vi-VN-HoaiMyNeural">
+    <script>
+        (function () {
+            if (document.documentElement.classList.contains('light')) {
+                document.body.classList.add('light');
+                document.body.classList.remove('dark');
+            } else {
+                document.body.classList.add('dark');
+                document.body.classList.remove('light');
+            }
+        })();
+    </script>
+    <canvas id="three-canvas"></canvas>
+
+    <div class="app-wrapper">
+        <header class="navbar-glass">
+            <div class="navbar-container">
+                <div class="navbar-brand-group">
+                    <button type="button" id="toggleHistoryDrawerBtn" class="nav-drawer-toggle" aria-label="Mở lịch sử trò chuyện" title="Lịch sử chat">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
+                    <div class="navbar-brand">
+                        <a asp-controller="Home" asp-action="Index" class="brand-logo gradient-text">
+                            <img src="~/images/logo.png" alt="Logo COW.AI" class="brand-logo__image" />
+                            <span>COW.AI</span>
+                        </a>
+                    </div>
+                </div>
+
+                <nav class="navbar-nav">
+                    <a asp-controller="Home" asp-action="Index" class="nav-link">Trang chủ</a>
+                    <a asp-controller="Image" asp-action="Index" class="nav-link">Tạo ảnh</a>
+                    <a asp-controller="Document" asp-action="Summary" class="nav-link">Tóm tắt</a>
+                    <a asp-controller="Document" asp-action="CodeGen" class="nav-link">Viết code</a>
+                </nav>
+
+                <div class="theme-switcher">
+                    <button id="themeToggleBtn" class="theme-btn" type="button" aria-label="Chuyển đổi giao diện">
+                        <svg class="icon-theme" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                    </button>
+                    <div id="themeDropdownMenu" class="theme-dropdown glass-panel">
+                        <button type="button" class="theme-option active" data-theme="dark">Dark</button>
+                        <button type="button" class="theme-option" data-theme="light">Light</button>
+                        <button type="button" class="theme-option" data-theme="system">System</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main role="main" class="main-content">
+            @RenderBody()
+        </main>
+
+        <footer class="footer-glass">
+            <div class="footer-glass__container">
+                <p class="footer-glass__copyright">&copy; 2026 COW.AI. Nền tảng trợ lý AI đa tác vụ.</p>
+                <div class="footer-glass__links">
+                    <a asp-controller="Home" asp-action="Index" class="footer-glass__link">Trang chủ</a>
+                    <a asp-controller="Image" asp-action="Index" class="footer-glass__link">Tạo ảnh</a>
+                    <a asp-controller="Document" asp-action="Summary" class="footer-glass__link">Tóm tắt</a>
+                    <a asp-controller="Document" asp-action="CodeGen" class="footer-glass__link">Viết code</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Chat History Drawer (Sidebar) -->
+    <aside id="chatHistoryDrawer" class="chat-drawer" aria-label="Lịch sử trò chuyện" aria-hidden="true">
+        <div class="chat-drawer__header">
+            <div class="chat-drawer__title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <span>Lịch sử trò chuyện</span>
+            </div>
+            <button type="button" id="closeDrawerBtn" class="chat-drawer__close" aria-label="Đóng lịch sử">✕</button>
+        </div>
+        <div class="chat-drawer__actions">
+            <button type="button" id="btnNewChat" class="btn-new-chat shimmer-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Đoạn chat mới</span>
+            </button>
+            <button type="button" id="btnExportChat" class="btn-export-chat" title="Xuất đoạn chat hiện tại ra Markdown (.md)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Xuất .md</span>
+            </button>
+        </div>
+        <div class="chat-drawer__list" id="sessionListContainer">
+            <!-- Danh sách session render động từ localStorage -->
+        </div>
+        <div class="chat-drawer__footer">
+            <button type="button" id="btnClearAllChats" class="btn-clear-all" title="Xóa toàn bộ lịch sử trò chuyện">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <span>Xóa toàn bộ lịch sử</span>
+            </button>
+        </div>
+    </aside>
+    <div id="drawerBackdrop" class="drawer-backdrop" aria-hidden="true"></div>
+
+    <script src="~/lib/three/three.min.js"></script>
+    <script src="~/js/three-background.js" asp-append-version="true"></script>
+    <script src="~/lib/marked.min.js" asp-append-version="true"></script>
+    <script src="~/lib/prism/prism.min.js" asp-append-version="true"></script>
+    <script src="~/lib/prism/prism-csharp.min.js" asp-append-version="true"></script>
+    <script src="~/lib/prism/prism-python.min.js" asp-append-version="true"></script>
+    <script src="~/js/modules/chat-history-store.js" asp-append-version="true"></script>
+    <script src="~/js/modules/voice-input.js" asp-append-version="true"></script>
+    <script src="~/js/modules/file-attachment.js" asp-append-version="true"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/chat-logic.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

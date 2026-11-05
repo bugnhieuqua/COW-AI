@@ -1,0 +1,236 @@
+/* ==========================================================================
+   COW.AI - Global Site CSS
+   ========================================================================== */
+
+:root {
+  --cow-accent: #0EA5E9;
+  --cow-gradient-start: #0EA5E9;
+  --cow-gradient-end: #6366F1;
+
+  /* Hệ thống khoảng cách chuẩn (Spacing System - Mục 5.1 ChuanSeo.md) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+
+  /* Theme tokens - Sáng (Trắng ra sáng, hoàn toàn không pha xanh) */
+  --cow-bg: #ffffff;
+  --cow-bg-secondary: #f8fafc;
+  --cow-border: #e2e8f0;
+  --cow-text: #0f172a;
+  --cow-text-muted: #64748b;
+  --cow-glass-bg: #ffffff;
+  --cow-glass-border: #e2e8f0;
+  --cow-input-bg: #f8fafc;
+  --cow-msg-user-bg: rgba(14, 165, 233, 0.1);
+  --cow-msg-ai-bg: #f8fafc;
+  --code-editor-bg: #f8fafc;
+  --code-editor-header: #f1f5f9;
+  --code-editor-border: #e2e8f0;
+  --code-editor-text: #1e293b;
+}
+
+/* Theme tokens - Tối (Tối là xanh - Tech Blue dịu mắt) */
+body.dark, html.dark, html.dark body, :root.dark {
+  --cow-bg: #0b132b;
+  --cow-bg-secondary: #1c2541;
+  --cow-border: #273549;
+  --cow-text: #f4f4f5;
+  --cow-text-muted: #94a3b8;
+  --cow-glass-bg: rgba(11, 19, 43, 0.72);
+  --cow-glass-border: rgba(255, 255, 255, 0.08);
+  --cow-input-bg: rgba(28, 37, 65, 0.65);
+  --cow-msg-user-bg: rgba(99, 102, 241, 0.22);
+  --cow-msg-ai-bg: rgba(255, 255, 255, 0.03);
+  --code-editor-bg: #111a33;
+  --code-editor-header: #0d152a;
+  --code-editor-border: #273549;
+  --code-editor-text: #f4f4f5;
+}
+
+/* Theme tokens - Sáng (Trắng ra sáng) */
+body.light, html.light, html.light body, :root.light {
+  --cow-bg: #ffffff;
+  --cow-bg-secondary: #f8fafc;
+  --cow-border: #e2e8f0;
+  --cow-text: #0f172a;
+  --cow-text-muted: #64748b;
+  --cow-glass-bg: #ffffff;
+  --cow-glass-border: #e2e8f0;
+  --cow-input-bg: #f8fafc;
+  --cow-msg-user-bg: rgba(14, 165, 233, 0.1);
+  --cow-msg-ai-bg: #f8fafc;
+  --code-editor-bg: #f8fafc;
+  --code-editor-header: #f1f5f9;
+  --code-editor-border: #e2e8f0;
+  --code-editor-text: #1e293b;
+}
+
+/* ==========================================================================
+   Utility Classes & UI State Management (Mục 13 UX.md)
+   ========================================================================== */
+.hidden {
+  display: none !important;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1rem;
+  gap: 0.75rem;
+}
+
+.success-state {
+  display: block;
+}
+
+.spinner {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--cow-accent, #0EA5E9);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.chat-result-wrapper {
+  margin-top: 32px;
+  background: rgba(20, 20, 25, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.response-content {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  position: relative;
+  min-height: 100%;
+}
+
+html, body {
+  background-color: var(--cow-bg);
+  color: var(--cow-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6; /* Body text line-height: 1.6 - Mục 5.1 */
+  overflow-x: hidden;
+}
+
+/* Typography chuẩn SEO & Accessibility (Mục 5.1 ChuanSeo.md) */
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2; /* Tiêu đề line-height: 1.2 */
+}
+
+small,
+.ai-badge,
+.ai-chip,
+.ai-label__sub,
+.input-hint,
+button,
+.btn-send,
+.ai-btn-primary,
+.ai-btn-secondary {
+  letter-spacing: 0.5px; /* Giãn chữ 0.5px cho text nhỏ và nút bấm */
+}
+
+/* ==========================================================================
+   Three.js Canvas Background
+   Canvas luôn trong suốt (transparent) để nền Tech Blue / White bên dưới hiển thị mượt mà
+   ========================================================================== */
+#three-canvas,
+#bg-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  background: transparent !important;
+  display: block;
+}
+
+/* Nền Dark Mode: Tech Blue Gradient hiển thị đồng nhất toàn trang */
+html.dark,
+body.dark,
+html.dark body {
+  background-color: #0b132b !important;
+  background: linear-gradient(135deg, #0b132b 0%, #1c2541 100%) !important;
+  background-attachment: fixed !important;
+}
+
+/* Nền Light Mode: Trắng ra sáng */
+html.light,
+body.light,
+html.light body {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  background-attachment: initial !important;
+}
+
+/* ==========================================================================
+   Layout Containers
+   ========================================================================== */
+.app-wrapper {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  padding-top: 4rem;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}

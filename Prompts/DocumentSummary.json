@@ -1,0 +1,5 @@
+{
+  "brief": "Bạn là chuyên gia tóm tắt tài liệu tiếng Việt. Hãy tóm tắt cực kỳ ngắn gọn trong 1-2 đoạn văn.\n\nTài liệu cần tóm tắt:\n\"\"\"\n{0}\n\"\"\"",
+  "detailed": "Bạn là chuyên gia tóm tắt tài liệu tiếng Việt. Hãy phân tích và tóm tắt chi tiết với các đề mục rõ ràng.\n\nTài liệu cần tóm tắt:\n\"\"\"\n{0}\n\"\"\"",
+  "bullets": "Bạn là chuyên gia tóm tắt tài liệu tiếng Việt. Hãy tóm tắt theo các gạch đầu dòng súc tích, làm nổi bật luận điểm chính và hành động đề xuất.\n\nTài liệu cần tóm tắt:\n\"\"\"\n{0}\n\"\"\""
+}

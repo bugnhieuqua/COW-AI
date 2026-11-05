@@ -1,0 +1,78 @@
+<div class="model-selector" id="modelSelector">
+    <!-- Input hidden để gửi lên Backend ASP.NET Core -->
+    <input type="hidden" name="selectedModel" id="hiddenSelectedModel" value="gemini" />
+    <input type="hidden" name="temperature" id="hiddenTemperature" value="0.7" />
+    <input type="hidden" name="maxTokens" id="hiddenMaxTokens" value="2048" />
+
+    <!-- Trigger (Nút bấm) -->
+    <button type="button" class="model-trigger" id="modelTrigger" aria-haspopup="listbox" aria-expanded="false">
+        <span class="model-trigger__label" id="currentModelLabel">Gemini 2.0 Flash</span>
+        <svg class="model-trigger__chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+
+    <!-- Menu (Popover xổ lên trên) -->
+    <div class="model-menu" id="modelMenu" role="listbox" aria-labelledby="modelTrigger">
+        <div class="model-menu__header">Chọn Model AI</div>
+        
+        <!-- Danh sách Model Dự án COW.AI -->
+        <div class="model-option" role="option" aria-selected="false" data-value="auto" tabindex="0">
+            <span class="model-option__name">Auto (Tự động)</span>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-option selected" role="option" aria-selected="true" data-value="gemini" tabindex="0">
+            <span class="model-option__name">Gemini 2.0 Flash</span>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        
+        <div class="model-option" role="option" aria-selected="false" data-value="llama3" tabindex="0">
+            <span class="model-option__name">Llama 3 8B</span>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-option" role="option" aria-selected="false" data-value="deepseek" tabindex="0">
+            <span class="model-option__name">DeepSeek R1</span>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-option" role="option" aria-selected="false" data-value="pollinations" tabindex="0">
+            <span class="model-option__name">Pollinations AI</span>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-option" role="option" aria-selected="false" data-value="omniroute" tabindex="0">
+            <span class="model-option__name">OmniRoute</span>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-option" role="option" aria-selected="false" data-value="duckduckgo" tabindex="0">
+            <span class="model-option__name">DuckDuckGo Search</span>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-menu__divider"></div>
+        <div class="model-menu__header">Chuyển văn bản thành giọng nói (TTS)</div>
+
+        <div class="model-option" role="option" aria-selected="false" data-value="edge-female" tabindex="0">
+            <span class="model-option__name">Edge TTS (Giọng Nữ)</span>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-option" role="option" aria-selected="false" data-value="edge-male" tabindex="0">
+            <span class="model-option__name">Edge TTS (Giọng Nam)</span>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-menu__divider"></div>
+
+        <!-- Cài đặt phụ -->
+        <button type="button" class="model-sub-setting" id="tempSettingBtn">
+            <span class="model-sub-setting__label">Temperature</span>
+            <span class="model-sub-setting__value" id="currentTempValue">0.7 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+        <button type="button" class="model-sub-setting" id="tokensSettingBtn">
+            <span class="model-sub-setting__label">Max Tokens</span>
+            <span class="model-sub-setting__value" id="currentTokensValue">2048 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+    </div>
+</div>

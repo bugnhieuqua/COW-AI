@@ -1,0 +1,24 @@
+# Antigravity agents
+.agent/
+.agents/
+
+ai-chat-ui/
+# Build and Output directories
+bin/
+obj/
+out/
+
+# User Secrets & Environment
+secrets.json
+.env
+.env.*
+!.env.example
+
+# IDE & Editor files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Reference repository (cloned at step 11.1)
+free-ChatGPT/

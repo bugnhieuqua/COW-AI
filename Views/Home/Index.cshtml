@@ -1,0 +1,171 @@
+@{
+    ViewData["Title"] = "Trang chủ - Trợ lý AI của bạn";
+}
+
+<div class="chat-app-viewport" id="chatAppViewport">
+    <!-- 1. Mid Section: Khung Lịch Sử Hội Thoại (Chiếm flex: 1 khi ở Bottom Mode) -->
+    <div class="chat-history-wrapper" id="chatHistoryWrapper">
+        <div class="chat-history-scroll" id="chatHistory" role="log" aria-live="polite">
+            <!-- Tin nhắn User & AI sẽ được append động vào đây -->
+        </div>
+    </div>
+
+    <!-- 2. Bottom Section: Khung Prompt Bar & Suggestions -->
+    <div class="chat-dock-section" id="chatDockSection">
+        <div class="chat-dock-inner">
+            <!-- Welcome Hero Header: Logo & Dòng chữ Phía trên đoạn chat (Tham chiếu Duck.ai - Hình 2) -->
+            <div class="chat-hero-header" id="chatHeroHeader">
+                <div class="chat-standalone-logo">
+                    <img src="~/images/logo.png" alt="COW.AI Mascot" class="chat-standalone-logo__img" />
+                </div>
+
+                <h1 class="chat-hero-title">
+                    <span class="gradient-text">COW.AI</span> - Trợ lý AI <span class="brand-underline">của bạn</span>
+                </h1>
+
+                <p class="chat-hero-subtitle" style>
+                    All chats are <span class="brand-underline">private</span> | Bảo mật &amp; phản hồi thời gian thực
+                </p>
+            </div>
+            <!-- Prompt Bar Form -->
+            <form id="chatPromptForm" class="prompt-form" onsubmit="return false;">
+                <input type="file" id="chatFileInput" class="hidden" accept=".txt,.md,.cs,.py,.js,.ts,.json,.sql,.html,.css" style="display:none;" />
+                <div class="gradient-border-box">
+                    <div class="input-card">
+                        <!-- Vùng preview tệp đính kèm -->
+                        <div id="attachmentPreviewArea" class="attachment-preview-area hidden"></div>
+
+                        <textarea 
+                            id="promptInput" 
+                            name="prompt" 
+                            rows="1" 
+                            placeholder="Hỏi bất kỳ điều gì hoặc nhập lệnh cho COW.AI..." 
+                            class="prompt-input prompt-textarea"
+                            aria-label="Nhập lệnh cho AI"
+                        ></textarea>
+
+                        <div class="input-card-footer">
+                            <div class="input-card-footer__left">
+                                <button type="button" class="btn-attach" id="attachBtn" aria-label="Đính kèm tệp" title="Đính kèm tệp văn bản / mã nguồn">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+                                </button>
+                                <partial name="_ModelSelector" />
+                            </div>
+
+                            <div class="input-card-footer__right">
+                                <button type="button" class="btn-voice" id="voiceInputBtn" aria-label="Nhập bằng giọng nói" title="Nhập bằng giọng nói (Tiếng Việt)">
+                                    <svg class="icon-mic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                                    </svg>
+                                </button>
+                                <button type="submit" id="submitBtn" class="prompt-submit btn-send shimmer-btn" aria-label="Gửi lệnh">
+                                    <span>Gửi</span>
+                                    <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Suggestion Prompts & Features Grid (Ẩn mượt mà khi vào Bottom Mode) -->
+            <div class="chat-suggestions-group" id="chatSuggestionsGroup">
+                <div class="example-prompts">
+                    <button type="button" class="example-prompt-btn" data-prompt="Vẽ tranh sơn dầu một chú bò phi hành gia bay lơ lửng giữa dải ngân hà neon" aria-label="Prompt mẫu: Bò phi hành gia">
+                        <span>🎨 Tạo ảnh: Bò phi hành gia giữa dải ngân hà neon</span>
+                        <svg class="example-prompt-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    <button type="button" class="example-prompt-btn" data-prompt="Tóm tắt các điểm then chốt của quy trình kiểm soát chất lượng phần mềm OWASP" aria-label="Prompt mẫu: Kiểm soát OWASP">
+                        <span>📄 Tóm tắt: Quy trình kiểm soát bảo mật OWASP</span>
+                        <svg class="example-prompt-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    <button type="button" class="example-prompt-btn" data-prompt="Viết code Python thuật toán Dijkstra tìm đường đi ngắn nhất có chú thích chi tiết" aria-label="Prompt mẫu: Thuật toán Dijkstra">
+                        <span>💻 Viết code: Thuật toán Dijkstra bằng Python</span>
+                        <svg class="example-prompt-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    <button type="button" class="example-prompt-btn" data-prompt="Giải thích nguyên lý hoạt động của mạng nơ-ron tích chập (CNN) cho người mới bắt đầu" aria-label="Prompt mẫu: Mạng CNN">
+                        <span>💡 Giải thích: Nguyên lý hoạt động của mạng CNN</span>
+                        <svg class="example-prompt-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Feature quick links -->
+                <div class="features-grid">
+                    <article class="feature-card-wrapper">
+                        <a asp-controller="Image" asp-action="Index" class="feature-card">
+                            <div class="feature-card__icon-wrapper">🎨</div>
+                            <h2 class="feature-card__title">Tạo ảnh AI</h2>
+                            <p class="feature-card__desc">Chuyển hóa văn bản thành tác phẩm nghệ thuật chất lượng cao.</p>
+                        </a>
+                    </article>
+                    <article class="feature-card-wrapper">
+                        <a asp-controller="Document" asp-action="Summary" class="feature-card">
+                            <div class="feature-card__icon-wrapper">📄</div>
+                            <h2 class="feature-card__title">Tóm tắt tài liệu</h2>
+                            <p class="feature-card__desc">Nén văn bản và báo cáo dài thành luận điểm cốt lõi súc tích.</p>
+                        </a>
+                    </article>
+                    <article class="feature-card-wrapper">
+                        <a asp-controller="Document" asp-action="CodeGen" class="feature-card">
+                            <div class="feature-card__icon-wrapper">💻</div>
+                            <h2 class="feature-card__title">Trợ lý viết code</h2>
+                            <p class="feature-card__desc">Sinh mã nguồn chuẩn mực, tối ưu thuật toán đa ngôn ngữ.</p>
+                        </a>
+                    </article>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Khung hiển thị kết quả AI (Auxiliary/legacy container bảo toàn tương thích) -->
+    <div id="aiResponseContainer" class="ai-response-container chat-result-wrapper hidden" style="display:none;" aria-hidden="true">
+        <div id="chatBoxCard" class="ai-response-card glass-panel hidden">
+            <div class="ai-response-card__header result-header">
+                <div class="ai-response-card__title">
+                    <span class="ai-status-indicator pulse"></span>
+                    <span id="responseModelBadge" class="model-name">Gemini 2.0 Flash</span>
+                </div>
+                <div class="ai-response-card__actions">
+                    <button type="button" id="copyChatBtn" class="ai-btn-action btn-copy" title="Sao chép nội dung">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        <span>Sao chép</span>
+                    </button>
+                    <button type="button" id="clearChatBtn" class="ai-btn-action" title="Đóng phản hồi">✕</button>
+                </div>
+            </div>
+            <div id="chatBox" class="ai-response-box response-content prose"></div>
+        </div>
+
+        <div id="imageBoxCard" class="ai-response-card glass-panel hidden">
+            <div class="ai-response-card__header">
+                <div class="ai-response-card__title">
+                    <span class="ai-status-indicator"></span>
+                    <span>Tác phẩm tạo bởi Pollinations AI</span>
+                </div>
+                <div class="ai-response-card__actions">
+                    <a id="downloadImageResultBtn" href="#" target="_blank" download="cow-ai-artwork.jpg" class="ai-btn-action">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>Tải ảnh</span>
+                    </a>
+                    <button type="button" id="clearImageBtn" class="ai-btn-action" title="Đóng ảnh">✕</button>
+                </div>
+            </div>
+            <div class="ai-image-wrapper">
+                <img id="imageResult" class="ai-image-result" alt="Ảnh kết quả tạo bởi AI" />
+            </div>
+        </div>
+    </div>
+</div>

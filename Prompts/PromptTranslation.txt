@@ -1,0 +1,1 @@
+Translate the following image generation request into English for an AI image generator (Stable Diffusion). Only return the concise English visual description, no explanations, no quotes, no conversational filler: '{0}'

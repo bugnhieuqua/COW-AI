@@ -1,0 +1,114 @@
+@{
+    ViewData["Title"] = "Tóm tắt tài liệu - COW.AI";
+}
+
+<main class="summary-page ai-app-container">
+    <div class="ai-app-layout">
+        <!-- Cột trái: Đầu vào tài liệu -->
+        <section class="ai-panel">
+            <div class="ai-panel__header">
+                <div class="ai-panel__title-group">
+                    <h1 class="ai-panel__title">Tóm tắt tài liệu</h1>
+                    <p class="ai-panel__subtitle">Chắt lọc ý chính, rút ngắn thời gian đọc và nghiên cứu tài liệu</p>
+                </div>
+                <div class="ai-badge ai-badge--tag">
+                    <span>NLP Engine</span>
+                </div>
+            </div>
+
+            <!-- Tabs chuyển đổi phương thức nhập -->
+            <div class="doc-tabs">
+                <button type="button" id="tabTextBtn" class="doc-tab active" aria-label="Nhập văn bản">Nhập văn bản</button>
+                <button type="button" id="tabFileBtn" class="doc-tab" aria-label="Tải tệp tin">Tải tệp tin (.pdf, .docx, .txt)</button>
+            </div>
+
+            <form id="summaryForm" class="ai-form" onsubmit="return false;">
+                <!-- Khung nhập văn bản trực tiếp -->
+                <div id="textInputContainer" class="ai-form-group">
+                    <label for="summaryInput" class="ai-label">
+                        <span>Nội dung tài liệu cần tóm tắt</span>
+                        <span id="charCount" class="ai-label__sub">0 ký tự</span>
+                    </label>
+                    <textarea 
+                        id="summaryInput" 
+                        rows="8" 
+                        class="form-control ai-textarea" 
+                        placeholder="Dán nội dung tài liệu, bài báo khoa học hoặc biên bản cuộc họp vào đây..."
+                        aria-label="Văn bản cần tóm tắt"
+                    ></textarea>
+                </div>
+
+                <!-- Khung Kéo thả tệp tin (Drag & Drop Zone) -->
+                <div id="fileInputContainer" class="ai-form-group hidden">
+                    <label class="ai-label">Chọn hoặc kéo thả tệp tin</label>
+                    <div id="summaryDropzone" class="doc-dropzone" role="button" aria-label="Kéo thả tệp tin hoặc nhấp để chọn">
+                        <div class="doc-dropzone__icon">📁</div>
+                        <div class="doc-dropzone__text">Kéo thả tài liệu vào đây hoặc nhấp để chọn tệp</div>
+                        <div class="doc-dropzone__subtext">Hỗ trợ PDF, DOCX, TXT, MD (Tối đa 25MB)</div>
+                        <input type="file" id="summaryFileInput" accept=".pdf,.docx,.txt,.md" class="hidden" aria-label="Tải tệp lên" />
+                    </div>
+                    <div id="fileSelectedInfo" class="doc-file-info hidden">
+                        <span id="fileNameDisplay">tailieu.pdf</span>
+                        <button type="button" id="removeFileBtn" class="theme-btn" aria-label="Xóa tệp đã chọn">✕</button>
+                    </div>
+                </div>
+
+                <!-- Tùy chọn Độ dài tóm tắt -->
+                <div class="ai-form-group">
+                    <label class="ai-label">Độ chi tiết mong muốn</label>
+                    <div class="chip-group ai-chips-group" id="lengthChips">
+                        <button type="button" class="ai-chip active" data-length="bullets">Gạch đầu dòng (Súc tích)</button>
+                        <button type="button" class="ai-chip" data-length="detailed">Bản phân tích chi tiết</button>
+                        <button type="button" class="ai-chip" data-length="action">Danh sách hành động (Action Items)</button>
+                    </div>
+                </div>
+
+                <button type="submit" id="summarySubmitBtn" class="ai-btn-primary shimmer-btn" aria-label="Tóm tắt ngay">
+                    <span id="summaryBtnSpinner" class="ai-spinner hidden"></span>
+                    <span id="summaryBtnText">Tóm tắt ngay</span>
+                </button>
+            </form>
+        </section>
+
+        <!-- Cột phải: Kết quả tóm tắt -->
+        <section class="result-panel ai-panel">
+            <div class="ai-panel__header">
+                <div class="ai-panel__title-group">
+                    <h2 class="ai-panel__title">Kết quả trích xuất</h2>
+                    <p class="ai-panel__subtitle">Bản tóm lược những luận điểm trọng tâm nhất</p>
+                </div>
+                <div class="ai-badge ai-badge--tag" id="summaryStatusBadge">
+                    <span>Sẵn sàng</span>
+                </div>
+            </div>
+
+            <div id="summaryOutputContainer" class="summary-output">
+                <div id="summaryEmptyState" class="image-preview-empty">
+                    <div class="image-preview-empty__icon">📑</div>
+                    <div class="image-preview-empty__text">Chưa có kết quả tóm tắt</div>
+                    <div class="image-preview-empty__subtext">Nội dung tóm tắt súc tích từ AI sẽ xuất hiện tại đây</div>
+                </div>
+
+                <div id="summaryResultContent" class="hidden">
+                    <!-- Nội dung tóm tắt được hiển thị qua script -->
+                </div>
+            </div>
+
+            <!-- Công cụ hỗ trợ sau khi tóm tắt -->
+            <div id="summaryActionsBar" class="image-preview-actions hidden">
+                <button type="button" id="copySummaryBtn" class="ai-btn-secondary" aria-label="Sao chép kết quả tóm tắt">
+                    <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                    <span>Sao chép kết quả</span>
+                </button>
+                <button type="button" id="exportTxtBtn" class="ai-btn-secondary" aria-label="Xuất file văn bản">
+                    <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Xuất file .txt</span>
+                </button>
+            </div>
+        </section>
+    </div>
+</main>

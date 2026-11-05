@@ -1,0 +1,115 @@
+@{
+    ViewData["Title"] = "Tạo ảnh AI - COW.AI";
+}
+
+<main class="image-generator-page ai-app-container">
+    <div class="ai-app-layout">
+        <!-- Cột trái: Form cấu hình & tạo ảnh -->
+        <section class="ai-panel">
+            <div class="ai-panel__header">
+                <div class="ai-panel__title-group">
+                    <h1 class="ai-panel__title">Tạo ảnh AI</h1>
+                    <p class="ai-panel__subtitle">Biến ý tưởng thành tác phẩm nghệ thuật kỹ thuật số đỉnh cao</p>
+                </div>
+                <div class="ai-badge ai-badge--quota" id="imageQuotaBadge">
+                    <span>⚡ Còn 5/5 lượt hôm nay</span>
+                </div>
+            </div>
+
+            <form id="imageGenForm" class="ai-form" onsubmit="return false;">
+                <div class="ai-form-group">
+                    <label for="prompt-input" class="ai-label">
+                        <span>Mô tả bức ảnh bạn muốn tạo</span>
+                        <span class="ai-label__sub">Hỗ trợ tiếng Việt & tiếng Anh</span>
+                    </label>
+                    <textarea 
+                        id="prompt-input" 
+                        rows="4" 
+                        class="form-control ai-textarea" 
+                        placeholder="Ví dụ: Một phi hành gia cưỡi ngựa trắng trên bề mặt mặt trăng, phong cách tranh sơn dầu hoài cổ, ánh sáng vàng kim lung linh..."
+                        aria-label="Mô tả bức ảnh cần tạo"
+                        required
+                    ></textarea>
+                </div>
+
+                <!-- Tùy chọn Tỉ lệ khung hình (Aspect Ratio Chips) -->
+                <div class="ai-form-group">
+                    <label class="ai-label">Tỉ lệ khung hình</label>
+                    <div class="chip-group ai-chips-group" id="ratioChips">
+                        <button type="button" class="ai-chip active" data-ratio="1:1" aria-label="Tỉ lệ 1:1 vuông">1:1 (Vuông)</button>
+                        <button type="button" class="ai-chip" data-ratio="16:9" aria-label="Tỉ lệ 16:9 ngang">16:9 (Ngang)</button>
+                        <button type="button" class="ai-chip" data-ratio="9:16" aria-label="Tỉ lệ 9:16 dọc">9:16 (Dọc Story)</button>
+                    </div>
+                </div>
+
+                <!-- Tùy chọn Phong cách nghệ thuật (Art Style Chips) -->
+                <div class="ai-form-group">
+                    <label class="ai-label">Phong cách nghệ thuật</label>
+                    <div class="chip-group ai-chips-group" id="styleChips">
+                        <button type="button" class="ai-chip active" data-style="photorealistic">Chân thực (Realistic)</button>
+                        <button type="button" class="ai-chip" data-style="cyberpunk">Cyberpunk Neon</button>
+                        <button type="button" class="ai-chip" data-style="anime">Anime Nhật Bản</button>
+                        <button type="button" class="ai-chip" data-style="3d-render">3D Pixar</button>
+                        <button type="button" class="ai-chip" data-style="oil-painting">Sơn dầu Cổ điển</button>
+                    </div>
+                </div>
+
+                <button type="submit" id="imageSubmitBtn" class="ai-btn-primary shimmer-btn" aria-label="Tạo ảnh ngay">
+                    <span id="imageBtnSpinner" class="ai-spinner hidden"></span>
+                    <span id="imageBtnText">Tạo ảnh ngay</span>
+                </button>
+            </form>
+        </section>
+
+        <!-- Cột phải: Khung hiển thị ảnh kết quả -->
+        <section class="result-panel ai-panel">
+            <div class="ai-panel__header">
+                <div class="ai-panel__title-group">
+                    <h2 class="ai-panel__title">Khung ảnh tác phẩm</h2>
+                    <p class="ai-panel__subtitle">Xem trước kết quả kết xuất ở độ phân giải sắc nét</p>
+                </div>
+                <div class="ai-badge ai-badge--tag" id="imageStatusTag">
+                    <span>Chờ tác vụ</span>
+                </div>
+            </div>
+
+            <!-- Khung ảnh có min-height: 400px, viền nét đứt (Mục 5.4 ChuanSeo.md & Mục 13.3 UX.md) -->
+            <div id="imagePreviewContainer" class="image-preview-frame image-preview-frame--empty">
+                <!-- Trạng thái Empty (Mặc định) -->
+                <div id="imageEmptyState" class="image-preview-empty empty-state">
+                    <div class="image-preview-empty__icon">🖼️</div>
+                    <div class="image-preview-empty__text">Chưa có ảnh nào được tạo</div>
+                    <div class="image-preview-empty__subtext">Hãy nhập mô tả ở cột bên trái và bấm &ldquo;Tạo ảnh ngay&rdquo;</div>
+                </div>
+
+                <!-- Trạng thái Loading (Ẩn mặc định) -->
+                <div id="imageLoadingState" class="image-preview-loading loading-state hidden">
+                    <div class="ai-spinner spinner"></div>
+                    <p class="image-preview-empty__text">AI đang kiến tạo từng nét vẽ...</p>
+                    <p class="image-preview-empty__subtext">Quá trình này mất khoảng 2 - 4 giây</p>
+                </div>
+
+                <!-- Trạng thái Success (Ẩn mặc định) -->
+                <div id="imageSuccessState" class="success-state hidden">
+                    <img id="imageResultImg" class="image-preview-frame__img hidden" alt="Ảnh nghệ thuật được tạo bởi COW.AI" />
+                </div>
+            </div>
+
+            <!-- Thanh công cụ sau khi tạo ảnh -->
+            <div id="imageActionsBar" class="image-preview-actions hidden">
+                <button type="button" id="downloadImageBtn" class="ai-btn-secondary" aria-label="Tải ảnh về máy">
+                    <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Tải ảnh về</span>
+                </button>
+                <button type="button" id="regenerateImageBtn" class="ai-btn-secondary" aria-label="Tạo biến thể ảnh khác">
+                    <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Tạo biến thể khác</span>
+                </button>
+            </div>
+        </section>
+    </div>
+</main>

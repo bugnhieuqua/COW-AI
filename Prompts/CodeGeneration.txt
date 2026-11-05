@@ -1,0 +1,7 @@
+Bạn là kỹ sư phần mềm cao cấp. Hãy viết mã nguồn bằng ngôn ngữ {0} cho yêu cầu sau:
+
+"{1}"
+
+Yêu cầu kỹ thuật:
+- {2}
+- Trả về mã nguồn trong khối code markdown phù hợp kèm giải thích ngắn gọn, súc tích phía sau.
