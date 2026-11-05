@@ -12,9 +12,10 @@ builder.Services.AddSingleton<PollinationsService>();
 builder.Services.AddSingleton<IntentDispatcherService>();
 builder.Services.AddTransient<PromptService>();
 
-// Đăng ký dịch vụ Edge TTS
+// Đăng ký dịch vụ Edge TTS (Facade Pattern)
 builder.Services.AddSingleton<EdgeTtsClient>();
 builder.Services.AddScoped<EdgeTtsService>();
+builder.Services.AddScoped<ITtsService, TtsService>();
 
 var app = builder.Build();
 

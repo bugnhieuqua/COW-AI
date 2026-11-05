@@ -10,7 +10,7 @@ public class HomeController : Controller
     private readonly OpenRouterService _openRouter;
     private readonly PollinationsService _pollinations;
     private readonly PromptService _promptService;
-    private readonly EdgeTtsService _edgeTtsService;
+    private readonly ITtsService _ttsService;
     private readonly DuckDuckGoService _duckDuckGo;
     private readonly IntentDispatcherService _intentDispatcher;
     private readonly ILogger<HomeController>? _logger;
@@ -24,7 +24,7 @@ public class HomeController : Controller
         OpenRouterService openRouter, 
         PollinationsService pollinations, 
         PromptService promptService,
-        EdgeTtsService edgeTtsService,
+        ITtsService ttsService,
         DuckDuckGoService duckDuckGo,
         IntentDispatcherService intentDispatcher,
         ILogger<HomeController>? logger = null)
@@ -32,7 +32,7 @@ public class HomeController : Controller
         _openRouter = openRouter;
         _pollinations = pollinations;
         _promptService = promptService;
-        _edgeTtsService = edgeTtsService;
+        _ttsService = ttsService;
         _duckDuckGo = duckDuckGo;
         _intentDispatcher = intentDispatcher;
         _logger = logger;
@@ -66,7 +66,7 @@ public class HomeController : Controller
 
             try
             {
-                await _edgeTtsService.StreamToResponseAsync(prompt, Response.Body, voiceName, cancellationToken);
+                await _ttsService.StreamToResponseAsync(prompt, Response.Body, voiceName, cancellationToken);
             }
             catch (OperationCanceledException)
             {

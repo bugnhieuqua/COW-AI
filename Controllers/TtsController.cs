@@ -9,10 +9,10 @@ public class TtsController : ControllerBase
 {
     private const int MaxTextLength = 12000;
 
-    private readonly EdgeTtsService _ttsService;
+    private readonly ITtsService _ttsService;
     private readonly ILogger<TtsController>? _logger;
 
-    public TtsController(EdgeTtsService ttsService, ILogger<TtsController>? logger = null)
+    public TtsController(ITtsService ttsService, ILogger<TtsController>? logger = null)
     {
         _ttsService = ttsService;
         _logger = logger;

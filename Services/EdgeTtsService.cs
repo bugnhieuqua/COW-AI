@@ -2,7 +2,7 @@ using System.Text;
 
 namespace COW_AI.Services;
 
-public class EdgeTtsService
+public class EdgeTtsService : ITtsService
 {
     private const int MaxChunkLength = 1800;
     private const string FallbackVoice = "vi-VN-HoaiMyNeural";
