@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -6,8 +8,22 @@ namespace COW_AI.Services;
 
 public class PromptService
 {
+    private const string FallbackTranslatorClient = "PollinationsText";
+    private const int MaxTranslatedPromptLength = 1500;
+    private const int MaxCacheEntries = 256;
+
+    private static readonly HttpClient SharedFallbackHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(25)
+    };
+
+    private static readonly ConcurrentDictionary<string, string> TranslationCache = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly string _promptsPath;
     private readonly OpenRouterService _openRouter;
+    private readonly IHttpClientFactory? _httpClientFactory;
+    private readonly string _fallbackTranslatorUrl;
+    private readonly string _neuralTranslateUrl;
     private readonly ILogger<PromptService>? _logger;
     private readonly ConcurrentDictionary<string, string> _templateCache = new(StringComparer.OrdinalIgnoreCase);
 
@@ -21,11 +37,65 @@ public class PromptService
         RegexOptions.IgnoreCase | RegexOptions.Compiled
     );
 
-    public PromptService(IWebHostEnvironment env, OpenRouterService openRouter, ILogger<PromptService>? logger = null)
+    /// <summary>
+    /// Nhận diện cụm chất liệu/trường phái hội họa đi kèm chữ "tranh ..." (ví dụ: "tranh sơn dầu", "tranh màu nước")
+    /// để không gọt mất chữ "tranh" khiến "tranh sơn dầu" bị biến dạng thành "sơn dầu".
+    /// </summary>
+    private static readonly Regex PreservedArtMediumRegex = new(
+        @"^tranh\s+(?:sơn\s+dầu|màu\s+nước|thủy\s+mặc|sơn\s+mài|lụa|chì|than|phấn|acrylic|cổ\s+điển|trừu\s+tượng|siêu\s+thực|ấn\s+tượng|dân\s+gian|đông\s+hồ|khắc\s+gỗ|tường|mosaic|ghép|kỹ\s+thuật\s+số|digital|3d|anime|manga|pixel|biếm\s+họa|minh\s+họa)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    /// <summary>
+    /// Chuẩn hóa cụm "<animal> astronaut" hoặc "astronaut <animal>" để danh từ chính luôn là con vật, tránh diffusion model vẽ mặt người.
+    /// </summary>
+    private static readonly Regex AnimalAstronautRegex = new(
+        @"\b(?:(?<animal>cow|cattle|bull|calf|cat|kitten|dog|puppy|shiba|corgi|bear|panda|fox|rabbit|bunny|pig|duck|frog|monkey|tiger|lion|elephant)\s+astronaut|astronaut\s+(?<animal>cow|cattle|bull|calf|cat|kitten|dog|puppy|shiba|corgi|bear|panda|fox|rabbit|bunny|pig|duck|frog|monkey|tiger|lion|elephant))\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly string[] LeadingFillerPhrases =
+    [
+        "bạn ơi hãy", "bạn ơi", "làm ơn hãy", "làm ơn", "vui lòng",
+        "hãy vẽ cho tôi", "hãy vẽ giúp tôi", "tạo cho tôi một bức ảnh", "tạo giúp tôi một bức ảnh",
+        "hãy tạo một bức ảnh", "vẽ một bức ảnh", "tạo một bức ảnh",
+        "tạo cho tôi bức ảnh", "tạo giúp tôi bức ảnh", "tạo giùm tôi bức ảnh", "tạo cho mình bức ảnh",
+        "hãy vẽ một bức", "vẽ một bức", "tạo một bức",
+        "vẽ cho tôi", "vẽ giúp tôi", "vẽ hộ tôi", "vẽ giùm tôi", "vẽ cho mình",
+        "tạo ảnh cho tôi", "tạo cho tôi ảnh", "tạo giúp tôi ảnh", "tạo giùm tôi ảnh", "tạo cho mình ảnh",
+        "tạo giúp tôi", "tạo cho tôi", "tạo giùm tôi", "tạo cho mình",
+        "hãy tạo ảnh", "tạo hình ảnh", "tạo ảnh", "sinh ảnh",
+        "hãy vẽ hình", "vẽ hình",
+        "phác họa cho tôi", "hãy phác họa", "phác họa",
+        "thiết kế cho tôi", "thiết kế hình ảnh", "thiết kế ảnh", "render ảnh",
+        "tạo wallpaper", "tạo hình nền", "vẽ wallpaper", "vẽ hình nền",
+        "hãy vẽ một", "hãy vẽ",
+        "generate an image of", "generate image of", "generate image",
+        "create an image of", "create image of",
+        "draw a picture of", "draw for me", "picture of", "photo of"
+    ];
+
+    public PromptService(
+        IWebHostEnvironment env,
+        OpenRouterService openRouter,
+        IConfiguration? config = null,
+        IHttpClientFactory? httpClientFactory = null,
+        ILogger<PromptService>? logger = null)
     {
         _promptsPath = Path.Combine(env.ContentRootPath, "Prompts");
         _openRouter = openRouter;
+        _httpClientFactory = httpClientFactory;
+        _fallbackTranslatorUrl = config?["Pollinations:TextUrl"] ?? "https://text.pollinations.ai/";
+        _neuralTranslateUrl = config?["Pollinations:FallbackTranslateUrl"] ?? "https://translate.googleapis.com/translate_a/single";
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Kiểm tra xem chuỗi bắt đầu bằng cụm "tranh + chất liệu nghệ thuật" cần bảo toàn hay không.
+    /// </summary>
+    public static bool StartsWithPreservedArtMedium(string text)
+    {
+        return !string.IsNullOrWhiteSpace(text) && PreservedArtMediumRegex.IsMatch(text.TrimStart());
     }
 
     /// <summary>
@@ -66,27 +136,292 @@ public class PromptService
     }
 
     /// <summary>
-    /// Dịch yêu cầu tạo ảnh từ tiếng Việt sang tiếng Anh súc tích qua template ngoài.
+    /// Dịch yêu cầu tạo ảnh từ tiếng Việt sang tiếng Anh qua kiến trúc 3 tầng dự phòng:
+    /// 1. OpenRouter (template PromptTranslation.txt) khi đã cấu hình API key.
+    /// 2. Pollinations Text API miễn phí (openai-fast, template PromptTranslationFallback.txt).
+    /// 3. Neural Machine Translation tốc độ cao khi cả hai LLM trên quá tải hoặc hết hạn mức.
     /// </summary>
     public async Task<string> TranslateToEnglishAsync(string vietnameseText, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(vietnameseText))
             return string.Empty;
 
-        var template = GetTemplate("PromptTranslation.txt", "{0}");
-        var prompt = string.Format(template, vietnameseText);
+        var cacheKey = vietnameseText.Trim();
+        if (TranslationCache.TryGetValue(cacheKey, out var cachedTranslation))
+        {
+            return cachedTranslation;
+        }
+
+        // Tầng 1: OpenRouter LLM
+        try
+        {
+            var template = GetTemplate("PromptTranslation.txt", "{0}");
+            var promptPayload = FormatSinglePlaceholder(template, cacheKey);
+            var translated = await _openRouter.ChatAsync(promptPayload, "gemini", cancellationToken);
+            if (TryAcceptTranslation(translated, out var accepted))
+            {
+                return CacheAndReturn(cacheKey, EnsureAnimalSubjectGrounding(accepted));
+            }
+            _logger?.LogWarning("OpenRouter trả về bản dịch không hợp lệ cho: {Text}. Chuyển sang tầng 2.", cacheKey);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger?.LogWarning(ex, "OpenRouter không dịch được prompt: {Text}. Chuyển sang tầng 2.", cacheKey);
+        }
+
+        // Tầng 2: Pollinations Text API (openai-fast với reasoning_effort = low)
+        try
+        {
+            var translated = await TranslateWithPollinationsTextAsync(cacheKey, cancellationToken);
+            if (TryAcceptTranslation(translated, out var accepted))
+            {
+                return CacheAndReturn(cacheKey, EnsureAnimalSubjectGrounding(accepted));
+            }
+            _logger?.LogWarning("Pollinations Text API trả về kết quả không hợp lệ cho: {Text}. Chuyển sang tầng 3.", cacheKey);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger?.LogWarning(ex, "Pollinations Text API thất bại cho: {Text}. Chuyển sang tầng 3.", cacheKey);
+        }
+
+        // Tầng 3: Dịch máy Neural tốc độ cao (đảm bảo luôn có tiếng Anh chuẩn cho mô hình tạo ảnh)
+        try
+        {
+            var translated = await TranslateWithNeuralFallbackAsync(cacheKey, cancellationToken);
+            if (TryAcceptTranslation(translated, out var accepted))
+            {
+                return CacheAndReturn(cacheKey, EnsureAnimalSubjectGrounding(accepted));
+            }
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger?.LogWarning(ex, "Tầng dịch dự phòng thứ 3 thất bại cho: {Text}.", cacheKey);
+        }
+
+        _logger?.LogError("Không dịch được prompt tạo ảnh sang tiếng Anh, dùng bản bỏ dấu dự phòng: {Text}", cacheKey);
+        return FoldVietnameseDiacritics(cacheKey);
+    }
+
+    private static string CacheAndReturn(string key, string value)
+    {
+        if (TranslationCache.Count >= MaxCacheEntries)
+        {
+            TranslationCache.Clear();
+        }
+        TranslationCache[key] = value;
+        return value;
+    }
+
+    private async Task<string?> TranslateWithPollinationsTextAsync(string vietnameseText, CancellationToken cancellationToken)
+    {
+        var template = GetTemplate("PromptTranslationFallback.txt", "{0}");
+        var instruction = FormatSinglePlaceholder(template, vietnameseText);
+        var client = _httpClientFactory?.CreateClient(FallbackTranslatorClient) ?? SharedFallbackHttpClient;
+        var baseUrl = _fallbackTranslatorUrl.TrimEnd('/');
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(12));
+
+        var openAiUrl = baseUrl.EndsWith("/openai", StringComparison.OrdinalIgnoreCase)
+            ? baseUrl
+            : baseUrl + "/openai";
+
+        var requestBody = JsonSerializer.Serialize(new
+        {
+            model = "openai-fast",
+            reasoning_effort = "low",
+            messages = new[]
+            {
+                new { role = "user", content = instruction }
+            },
+            temperature = 0.3
+        });
+
+        using var content = new StringContent(requestBody, Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync(openAiUrl, content, timeout.Token);
+        response.EnsureSuccessStatusCode();
+
+        var raw = await response.Content.ReadAsStringAsync(timeout.Token);
+        return ExtractOpenAiContentOrRaw(raw);
+    }
+
+    private async Task<string?> TranslateWithNeuralFallbackAsync(string vietnameseText, CancellationToken cancellationToken)
+    {
+        var client = _httpClientFactory?.CreateClient(FallbackTranslatorClient) ?? SharedFallbackHttpClient;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+
+        var url = $"{_neuralTranslateUrl}?client=gtx&sl=vi&tl=en&dt=t&q={Uri.EscapeDataString(vietnameseText)}";
+        using var response = await client.GetAsync(url, timeout.Token);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(timeout.Token);
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() == 0)
+            return null;
+
+        var sentences = doc.RootElement[0];
+        if (sentences.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var sb = new StringBuilder();
+        foreach (var segment in sentences.EnumerateArray())
+        {
+            if (segment.ValueKind == JsonValueKind.Array && segment.GetArrayLength() > 0)
+            {
+                var part = segment[0].GetString();
+                if (!string.IsNullOrEmpty(part))
+                {
+                    sb.Append(part);
+                }
+            }
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    private static string? ExtractOpenAiContentOrRaw(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        var trimmed = raw.Trim();
+        if (!trimmed.StartsWith("{", StringComparison.Ordinal))
+            return trimmed;
 
         try
         {
-            var translated = await _openRouter.ChatAsync(prompt, "gemini", cancellationToken);
-            var clean = translated?.Trim().Trim('\"', '\'', '`', '.', ' ') ?? string.Empty;
-            return string.IsNullOrWhiteSpace(clean) ? vietnameseText : clean;
+            using var doc = JsonDocument.Parse(trimmed);
+            if (doc.RootElement.TryGetProperty("choices", out var choices)
+                && choices.ValueKind == JsonValueKind.Array
+                && choices.GetArrayLength() > 0)
+            {
+                var first = choices[0];
+                if (first.TryGetProperty("message", out var msg)
+                    && msg.TryGetProperty("content", out var contentProp))
+                {
+                    return contentProp.GetString();
+                }
+            }
         }
-        catch (Exception ex)
+        catch
         {
-            _logger?.LogWarning(ex, "Lỗi khi dịch prompt tiếng Việt sang tiếng Anh cho: {Text}. Dùng prompt gốc.", vietnameseText);
-            return vietnameseText;
+            // Bỏ qua nếu JSON không đúng định dạng OpenAI
         }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Làm sạch nhãn markdown thừa từ LLM, chuẩn hóa khoảng trắng/ký tự đặc biệt và kiểm tra tỷ lệ tiếng Anh.
+    /// </summary>
+    private static bool TryAcceptTranslation(string? translated, out string accepted)
+    {
+        accepted = string.Empty;
+        if (string.IsNullOrWhiteSpace(translated))
+            return false;
+
+        var cleaned = translated.Trim();
+
+        // Gọt các tiêu đề dẫn nhập kiểu "**Oil-painting prompt:**" hoặc "Prompt:" mà LLM đôi khi thêm vào
+        cleaned = Regex.Replace(
+            cleaned,
+            @"^\s*(?:\*{1,2}[^*\n]{1,50}prompt\s*:?\*{1,2}|(?:english\s+(?:visual\s+)?)?prompt\s*:)\s*",
+            "",
+            RegexOptions.IgnoreCase);
+
+        cleaned = cleaned
+            .Replace('\u202F', ' ')
+            .Replace('\u00A0', ' ')
+            .Replace('\u2011', '-')
+            .Replace('\u2013', '-')
+            .Replace('\u2014', ',')
+            .Replace('“', '"')
+            .Replace('”', '"')
+            .Replace('‘', '\'')
+            .Replace('’', '\'');
+
+        var normalized = Regex.Replace(cleaned, @"\s+", " ").Trim();
+        normalized = normalized.Trim('"', '\'', '`', '*', ' ').TrimEnd('.').Trim();
+        if (string.IsNullOrWhiteSpace(normalized) || normalized.Length > MaxTranslatedPromptLength)
+            return false;
+
+        if (!VietnameseRegex.IsMatch(normalized))
+        {
+            accepted = normalized;
+            return true;
+        }
+
+        var words = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length == 0)
+            return false;
+
+        int accentedWords = 0;
+        foreach (var word in words)
+        {
+            if (VietnameseRegex.IsMatch(word))
+            {
+                accentedWords++;
+            }
+        }
+
+        // Nếu trên 20% từ vẫn mang dấu tiếng Việt -> model chưa dịch sang tiếng Anh
+        if ((double)accentedWords / words.Length > 0.20)
+            return false;
+
+        accepted = FoldVietnameseDiacritics(normalized);
+        return !string.IsNullOrWhiteSpace(accepted);
+    }
+
+    /// <summary>
+    /// Đảm bảo khi người dùng yêu cầu động vật đóng vai phi hành gia, con vật luôn là danh từ chính (tránh model ảnh vẽ khuôn mặt người).
+    /// </summary>
+    private static string EnsureAnimalSubjectGrounding(string englishPrompt)
+    {
+        if (string.IsNullOrWhiteSpace(englishPrompt) || !AnimalAstronautRegex.IsMatch(englishPrompt))
+            return englishPrompt;
+
+        return AnimalAstronautRegex.Replace(englishPrompt, match =>
+        {
+            var animal = match.Groups["animal"].Value.ToLowerInvariant();
+            return animal is "cow" or "cattle" or "calf"
+                ? "anthropomorphic black-and-white spotted dairy cow wearing a white NASA spacesuit and clear spherical glass helmet with actual bovine animal face, pink cow snout, and curved horns (no human face)"
+                : $"anthropomorphic {animal} wearing a white NASA spacesuit and clear spherical glass helmet with actual {animal} animal face and muzzle (no human face)";
+        });
+    }
+
+    private static string FoldVietnameseDiacritics(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return string.Empty;
+
+        var decomposed = input.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(decomposed.Length);
+        foreach (var ch in decomposed)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (category == UnicodeCategory.NonSpacingMark)
+                continue;
+
+            sb.Append(ch switch
+            {
+                'đ' => 'd',
+                'Đ' => 'D',
+                _ => ch
+            });
+        }
+
+        return sb.ToString().Normalize(NormalizationForm.FormC);
+    }
+
+    private static string FormatSinglePlaceholder(string template, string value)
+    {
+        if (string.IsNullOrEmpty(template))
+            return value;
+
+        return template.Contains("{0}", StringComparison.Ordinal)
+            ? template.Replace("{0}", value, StringComparison.Ordinal)
+            : string.Format(template, value);
     }
 
     /// <summary>
@@ -103,9 +438,13 @@ public class PromptService
         {
             englishPrompt = await TranslateToEnglishAsync(cleanPrompt, cancellationToken);
         }
+        else
+        {
+            englishPrompt = EnsureAnimalSubjectGrounding(englishPrompt);
+        }
 
         var template = GetTemplate("ImageGeneration.txt", "{0}");
-        return string.Format(template, englishPrompt);
+        return FormatSinglePlaceholder(template, englishPrompt);
     }
 
     /// <summary>
@@ -122,12 +461,12 @@ public class PromptService
             if (doc.RootElement.TryGetProperty(selectedStyle, out var styleProp))
             {
                 var template = styleProp.GetString() ?? "{0}";
-                return string.Format(template, content);
+                return FormatSinglePlaceholder(template, content);
             }
             if (doc.RootElement.TryGetProperty("bullets", out var defaultProp))
             {
                 var template = defaultProp.GetString() ?? "{0}";
-                return string.Format(template, content);
+                return FormatSinglePlaceholder(template, content);
             }
         }
         catch (Exception ex)
@@ -152,32 +491,91 @@ public class PromptService
         return string.Format(template, targetLanguage, prompt, standardDetails);
     }
 
+    /// <summary>
+    /// Gọt bỏ tiền tố mệnh lệnh ở đầu câu nhưng bảo toàn các chất liệu hội họa như "tranh sơn dầu", "tranh màu nước".
+    /// </summary>
     public static string CleanUserIntent(string prompt)
     {
         if (string.IsNullOrWhiteSpace(prompt))
             return string.Empty;
 
-        string[] fillers = [
-            "hãy vẽ cho tôi", "tạo cho tôi một bức ảnh", "hãy tạo một bức ảnh",
-            "vẽ một bức ảnh", "tạo một bức ảnh", "hãy vẽ một",
-            "vẽ cho tôi", "tạo ảnh cho tôi", "tạo ảnh", "vẽ hình",
-            "vẽ tranh", "sinh ảnh", "tạo hình ảnh", "hãy vẽ",
-            "generate image of", "generate image", "create an image of",
-            "picture of", "draw for me", "draw a picture of", "draw"
-        ];
+        var clean = prompt.Trim();
+        bool changed = true;
 
-        var clean = prompt;
-        foreach (var filler in fillers)
+        while (changed && !string.IsNullOrWhiteSpace(clean))
         {
-            clean = Regex.Replace(
-                clean,
-                Regex.Escape(filler),
-                "",
-                RegexOptions.IgnoreCase
-            );
+            changed = false;
+            clean = clean.TrimStart(':', '-', ',', ' ', '\t');
+
+            // Xử lý đặc biệt cho "hãy vẽ tranh ..." / "vẽ tranh ..." để bảo toàn "tranh sơn dầu", "tranh màu nước", ...
+            var tranhPrefixMatch = Regex.Match(clean, @"^(?:hãy\s+)?vẽ\s+(tranh\b.*)$", RegexOptions.IgnoreCase);
+            if (tranhPrefixMatch.Success)
+            {
+                var tranhRemainder = tranhPrefixMatch.Groups[1].Value.TrimStart();
+                if (StartsWithPreservedArtMedium(tranhRemainder))
+                {
+                    clean = tranhRemainder;
+                    changed = true;
+                    continue;
+                }
+
+                var afterTranh = Regex.Replace(tranhRemainder, @"^tranh\s*:?\s*", "", RegexOptions.IgnoreCase).TrimStart();
+                if (!string.IsNullOrWhiteSpace(afterTranh))
+                {
+                    clean = afterTranh;
+                    changed = true;
+                    continue;
+                }
+            }
+
+            foreach (var filler in LeadingFillerPhrases)
+            {
+                if (clean.StartsWith(filler, StringComparison.OrdinalIgnoreCase))
+                {
+                    var nextCharIndex = filler.Length;
+                    if (nextCharIndex == clean.Length || char.IsWhiteSpace(clean[nextCharIndex]) || clean[nextCharIndex] is ':' or '-' or ',')
+                    {
+                        var remainder = clean.Substring(nextCharIndex).TrimStart(':', '-', ',', ' ', '\t');
+                        if (!string.IsNullOrWhiteSpace(remainder))
+                        {
+                            clean = remainder;
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (changed)
+                continue;
+
+            // Gọt động từ đơn lẻ ở đầu câu (trừ khi đã bắt đầu bằng "tranh <chất liệu>")
+            if (!StartsWithPreservedArtMedium(clean))
+            {
+                var singleVerbMatch = Regex.Match(clean, @"^(?:tạo|vẽ|sinh|render|draw|paint|sketch)\s+(.+)$", RegexOptions.IgnoreCase);
+                if (singleVerbMatch.Success)
+                {
+                    var remainder = singleVerbMatch.Groups[1].Value.TrimStart(':', '-', ' ', '\t');
+                    if (!string.IsNullOrWhiteSpace(remainder))
+                    {
+                        clean = remainder;
+                        changed = true;
+                    }
+                }
+            }
         }
 
-        clean = clean.Trim().TrimStart(':', '-', ' ', '\t');
+        // Nếu sau khi gọt "vẽ cho tôi" còn "một bức tranh sơn dầu..." thì giữ từ "tranh sơn dầu..."
+        var bucTranhMatch = Regex.Match(clean, @"^(?:một\s+)?bức\s+(tranh\b.*)$", RegexOptions.IgnoreCase);
+        if (bucTranhMatch.Success)
+        {
+            var tranhPart = bucTranhMatch.Groups[1].Value.TrimStart();
+            clean = StartsWithPreservedArtMedium(tranhPart)
+                ? tranhPart
+                : Regex.Replace(tranhPart, @"^tranh\s+", "", RegexOptions.IgnoreCase);
+        }
+
+        clean = Regex.Replace(clean, @"\s{2,}", " ").Trim().TrimStart(':', '-', ' ', '\t');
         return string.IsNullOrWhiteSpace(clean) ? prompt.Trim() : clean.Trim();
     }
 }

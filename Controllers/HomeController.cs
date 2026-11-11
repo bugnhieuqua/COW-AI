@@ -8,6 +8,7 @@ namespace COW_AI.Controllers;
 public class HomeController : Controller
 {
     private readonly OpenRouterService _openRouter;
+    private readonly OllamaService _ollama;
     private readonly PollinationsService _pollinations;
     private readonly PromptService _promptService;
     private readonly ITtsService _ttsService;
@@ -22,6 +23,7 @@ public class HomeController : Controller
 
     public HomeController(
         OpenRouterService openRouter, 
+        OllamaService ollama,
         PollinationsService pollinations, 
         PromptService promptService,
         ITtsService ttsService,
@@ -30,6 +32,7 @@ public class HomeController : Controller
         ILogger<HomeController>? logger = null)
     {
         _openRouter = openRouter;
+        _ollama = ollama;
         _pollinations = pollinations;
         _promptService = promptService;
         _ttsService = ttsService;
@@ -98,8 +101,9 @@ public class HomeController : Controller
         {
             try
             {
-                var enhancedPrompt = await _promptService.GetImageGenerationPromptAsync(cleanPrompt, cancellationToken);
-                var imageUrl = _pollinations.GetImageUrl(enhancedPrompt);
+                var (width, height) = IntentDispatcherService.ExtractDimensions(cleanPrompt, out var finalPrompt);
+                var enhancedPrompt = await _promptService.GetImageGenerationPromptAsync(finalPrompt, cancellationToken);
+                var imageUrl = _pollinations.GetImageUrl(enhancedPrompt, width, height);
                 var payload = System.Text.Json.JsonSerializer.Serialize(new
                 {
                     is_image_url = imageUrl,
@@ -173,7 +177,76 @@ public class HomeController : Controller
             return new EmptyResult();
         }
 
-        // 4. Nhánh Chat văn bản qua OpenRouter
+        // 4. Nhánh Ollama Cloud & Local (Free open-weight models: gpt-oss:20b, gpt-oss:120b, mistral-nemo, phi4)
+        if (OllamaService.IsOllamaModel(normalizedModel))
+        {
+            bool ollamaDoneSent = false;
+            try
+            {
+                var stream = await _ollama.StreamChatAsync(prompt, normalizedModel, temperature, maxTokens, cancellationToken);
+                using var reader = new StreamReader(stream);
+                string? line;
+                while (!cancellationToken.IsCancellationRequested && (line = await reader.ReadLineAsync(cancellationToken)) != null)
+                {
+                    if (line.StartsWith("data: "))
+                    {
+                        var data = line.Substring(6).Trim();
+                        if (data == "[DONE]")
+                        {
+                            await Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
+                            ollamaDoneSent = true;
+                            break;
+                        }
+                        if (!string.IsNullOrEmpty(data))
+                        {
+                            await Response.WriteAsync($"data: {data}\n\n", cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
+                        }
+                    }
+                    else if (line.StartsWith("data:"))
+                    {
+                        var data = line.Substring(5).Trim();
+                        if (data == "[DONE]")
+                        {
+                            await Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
+                            ollamaDoneSent = true;
+                            break;
+                        }
+                        if (!string.IsNullOrEmpty(data))
+                        {
+                            await Response.WriteAsync($"data: {data}\n\n", cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
+                        }
+                    }
+                }
+
+                if (!ollamaDoneSent && !cancellationToken.IsCancellationRequested)
+                {
+                    await Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+                    await Response.Body.FlushAsync(cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Client ngắt kết nối
+            }
+            catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogWarning(ex, "Cảnh báo cấu hình Ollama cho prompt '{Prompt}' và model '{Model}'", prompt, normalizedModel);
+                await SendSafeSseErrorAsync(ex.Message, cancellationToken);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogError(ex, "Lỗi khi gọi Ollama Service cho prompt '{Prompt}' và model '{Model}'", prompt, normalizedModel);
+                await SendSafeSseErrorAsync("Dịch vụ Ollama Cloud/Local hiện không thể phản hồi. Vui lòng kiểm tra API key hoặc kết nối Ollama.", cancellationToken);
+            }
+
+            return new EmptyResult();
+        }
+
+        // 5. Nhánh Chat văn bản qua OpenRouter
         string modelToUse = normalizedModel ?? "gemini";
         if (normalizedModel == "auto")
         {
@@ -288,9 +361,10 @@ public class HomeController : Controller
 
         try
         {
-            var enhancedPrompt = await _promptService.GetImageGenerationPromptAsync(prompt, cancellationToken);
-            var imageUrl = _pollinations.GetImageUrl(enhancedPrompt);
-            return Json(new { url = imageUrl, prompt = prompt, enhanced_prompt = enhancedPrompt });
+            var (width, height) = IntentDispatcherService.ExtractDimensions(prompt, out var finalPrompt);
+            var enhancedPrompt = await _promptService.GetImageGenerationPromptAsync(finalPrompt, cancellationToken);
+            var imageUrl = _pollinations.GetImageUrl(enhancedPrompt, width, height);
+            return Json(new { url = imageUrl, prompt = prompt, enhanced_prompt = enhancedPrompt, width = width, height = height });
         }
         catch (Exception ex)
         {

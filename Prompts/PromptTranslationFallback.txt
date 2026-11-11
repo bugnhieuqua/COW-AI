@@ -1,0 +1,10 @@
+Translate the Vietnamese image request below into ONE vivid English text-to-image prompt (40 to 80 words).
+
+Rules:
+1. Keep every subject, action, wide or close framing, setting, lighting, and exact art medium ("tranh son dau" -> "expressive oil painting on canvas with thick impasto brushstrokes"; "tranh mau nuoc" -> "delicate watercolor painting on textured paper").
+2. Remove command words ("ve", "hay ve", "tao anh", "cho toi").
+3. If an animal has a human role (like "bo phi hanh gia"), make the ANIMAL the head noun wearing the outfit (write "an anthropomorphic black-and-white spotted dairy cow wearing a white spacesuit and clear spherical glass helmet, actual bovine animal face with pink cow snout and curved horns, no human face" — NEVER write "cow astronaut").
+4. Never add streets, alleys, or human crowds unless requested. Use pure ASCII English (Hoi An, Ha Long Bay, ao dai).
+5. Output ONLY the raw English prompt paragraph with no title, no markdown, and no quotes.
+
+Request: {0}

@@ -20,7 +20,7 @@
                 </div>
 
                 <h1 class="chat-hero-title">
-                    <span class="gradient-text">COW.AI</span> - Trợ lý AI <span class="brand-underline">của bạn</span>
+                    <span class="brand-title-accent">COW.AI</span> - Trợ lý AI <span class="brand-underline">của bạn</span>
                 </h1>
 
                 <p class="chat-hero-subtitle" style>
@@ -32,6 +32,13 @@
                 <input type="file" id="chatFileInput" class="hidden" accept=".txt,.md,.cs,.py,.js,.ts,.json,.sql,.html,.css" style="display:none;" />
                 <div class="gradient-border-box">
                     <div class="input-card">
+                        <!-- Thông báo Chế độ Đọc giọng nói (TTS) -->
+                        <div id="ttsModeNotice" class="tts-mode-banner hidden">
+                            <span class="tts-mode-banner__icon">🎙️</span>
+                            <span class="tts-mode-banner__text">Đang ở chế độ tạo giọng đọc âm thanh</span>
+                            <button type="button" id="btnExitTtsMode" class="tts-mode-banner__btn" title="Chuyển về Chat AI">✕ Quay lại Chat AI</button>
+                        </div>
+
                         <!-- Vùng preview tệp đính kèm -->
                         <div id="attachmentPreviewArea" class="attachment-preview-area hidden"></div>
 
@@ -164,7 +171,7 @@
                 </div>
             </div>
             <div class="ai-image-wrapper">
-                <img id="imageResult" class="ai-image-result" alt="Ảnh kết quả tạo bởi AI" />
+                <img id="imageResult" class="ai-image-result" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E" alt="Ảnh kết quả tạo bởi AI" loading="lazy" />
             </div>
         </div>
     </div>

@@ -1,6 +1,9 @@
 # Antigravity agents
 .agent/
 .agents/
+.backup_agents_skills/
+.codex/
+.impeccable/
 
 ai-chat-ui/
 # Build and Output directories
@@ -13,12 +16,15 @@ secrets.json
 .env
 .env.*
 !.env.example
+Key.env
+*.env
 
 # IDE & Editor files
 .vs/
 .vscode/
 *.user
 *.suo
-
+docs/
 # Reference repository (cloned at step 11.1)
 free-ChatGPT/
+*.env

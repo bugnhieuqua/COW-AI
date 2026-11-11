@@ -31,22 +31,22 @@
   --code-editor-text: #1e293b;
 }
 
-/* Theme tokens - Tối (Tối là xanh - Tech Blue dịu mắt) */
+/* Theme tokens - Tối (OLED Dark Slate chuẩn Kỹ thuật - ui-ux-pro-max) */
 body.dark, html.dark, html.dark body, :root.dark {
-  --cow-bg: #0b132b;
-  --cow-bg-secondary: #1c2541;
-  --cow-border: #273549;
-  --cow-text: #f4f4f5;
+  --cow-bg: #0f172a;
+  --cow-bg-secondary: #1b2336;
+  --cow-border: #334155;
+  --cow-text: #f8fafc;
   --cow-text-muted: #94a3b8;
-  --cow-glass-bg: rgba(11, 19, 43, 0.72);
+  --cow-glass-bg: rgba(15, 23, 42, 0.85);
   --cow-glass-border: rgba(255, 255, 255, 0.08);
-  --cow-input-bg: rgba(28, 37, 65, 0.65);
-  --cow-msg-user-bg: rgba(99, 102, 241, 0.22);
-  --cow-msg-ai-bg: rgba(255, 255, 255, 0.03);
+  --cow-input-bg: rgba(27, 35, 54, 0.85);
+  --cow-msg-user-bg: rgba(56, 189, 248, 0.12);
+  --cow-msg-ai-bg: rgba(27, 35, 54, 0.6);
   --code-editor-bg: #111a33;
   --code-editor-header: #0d152a;
-  --code-editor-border: #273549;
-  --code-editor-text: #f4f4f5;
+  --code-editor-border: #334155;
+  --code-editor-text: #f8fafc;
 }
 
 /* Theme tokens - Sáng (Trắng ra sáng) */
@@ -144,9 +144,13 @@ html, body {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.6; /* Body text line-height: 1.6 - Mục 5.1 */
   overflow-x: hidden;
+}
+
+code, kbd, samp, pre, .font-mono, textarea.prompt-textarea {
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 /* Typography chuẩn SEO & Accessibility (Mục 5.1 ChuanSeo.md) */

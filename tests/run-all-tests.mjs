@@ -78,6 +78,11 @@ const testSuites = [
         tier: 'Tier 10',
         title: 'Section 20 - Pollinations AI Vietnamese Prompt & Image Containment',
         file: path.join(__dirname, 'tier10-pollinations-update.test.mjs')
+    },
+    {
+        tier: 'Tier 11',
+        title: 'Ollama Cloud & Free Models Integration Verification',
+        file: path.join(__dirname, 'tier11-ollama-cloud-integration.test.mjs')
     }
 ];
 

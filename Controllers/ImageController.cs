@@ -34,9 +34,10 @@ public class ImageController : Controller
 
         try
         {
-            var enhancedPrompt = await _promptService.GetImageGenerationPromptAsync(prompt, cancellationToken);
-            var imageUrl = _pollinations.GetImageUrl(enhancedPrompt);
-            return Json(new { url = imageUrl, prompt = prompt, enhanced_prompt = enhancedPrompt });
+            var (width, height) = IntentDispatcherService.ExtractDimensions(prompt, out var finalPrompt);
+            var enhancedPrompt = await _promptService.GetImageGenerationPromptAsync(finalPrompt, cancellationToken);
+            var imageUrl = _pollinations.GetImageUrl(enhancedPrompt, width, height);
+            return Json(new { url = imageUrl, prompt = prompt, enhanced_prompt = enhancedPrompt, width = width, height = height });
         }
         catch (Exception ex)
         {

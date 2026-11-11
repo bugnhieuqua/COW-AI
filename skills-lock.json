@@ -73,6 +73,12 @@
       "skillPath": "plugin/skills/memory-discipline/SKILL.md",
       "computedHash": "6f659093364bc251dfdf9940675d116f7a244767e756c255d90ee44ea89060d8"
     },
+    "plantuml-skill": {
+      "source": "jovd83/plantuml-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "dd49254370c1f6ed601d5bff8f6399200b66a6bbc1f91d8ab4ea073dd1b422ce"
+    },
     "recall": {
       "source": "rohitg00/agentmemory",
       "sourceType": "github",

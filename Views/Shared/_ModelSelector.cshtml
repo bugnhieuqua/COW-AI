@@ -12,53 +12,96 @@
 
     <!-- Menu (Popover xổ lên trên) -->
     <div class="model-menu" id="modelMenu" role="listbox" aria-labelledby="modelTrigger">
-        <div class="model-menu__header">Chọn Model AI</div>
+        <div class="model-menu__header">Mô hình Trí tuệ Nhân tạo</div>
         
         <!-- Danh sách Model Dự án COW.AI -->
-        <div class="model-option" role="option" aria-selected="false" data-value="auto" tabindex="0">
+        <div class="model-option" role="option" aria-selected="false" data-value="auto" data-category="ai" tabindex="0">
             <span class="model-option__name">Auto (Tự động)</span>
             <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
 
-        <div class="model-option selected" role="option" aria-selected="true" data-value="gemini" tabindex="0">
+        <div class="model-option selected" role="option" aria-selected="true" data-value="gemini" data-category="ai" tabindex="0">
             <span class="model-option__name">Gemini 2.0 Flash</span>
             <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
         
-        <div class="model-option" role="option" aria-selected="false" data-value="llama3" tabindex="0">
+        <div class="model-option" role="option" aria-selected="false" data-value="llama3" data-category="ai" tabindex="0">
             <span class="model-option__name">Llama 3 8B</span>
             <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
 
-        <div class="model-option" role="option" aria-selected="false" data-value="deepseek" tabindex="0">
+        <div class="model-option" role="option" aria-selected="false" data-value="deepseek" data-category="ai" tabindex="0">
             <span class="model-option__name">DeepSeek R1</span>
             <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
 
-        <div class="model-option" role="option" aria-selected="false" data-value="pollinations" tabindex="0">
+        <div class="model-option" role="option" aria-selected="false" data-value="pollinations" data-category="ai" tabindex="0">
             <span class="model-option__name">Pollinations AI</span>
             <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
 
-        <div class="model-option" role="option" aria-selected="false" data-value="omniroute" tabindex="0">
+        <div class="model-option" role="option" aria-selected="false" data-value="omniroute" data-category="ai" tabindex="0">
             <span class="model-option__name">OmniRoute</span>
             <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
 
-        <div class="model-option" role="option" aria-selected="false" data-value="duckduckgo" tabindex="0">
+        <div class="model-option" role="option" aria-selected="false" data-value="duckduckgo" data-category="ai" tabindex="0">
             <span class="model-option__name">DuckDuckGo Search</span>
             <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
 
         <div class="model-menu__divider"></div>
-        <div class="model-menu__header">Chuyển văn bản thành giọng nói (TTS)</div>
+        <div class="model-menu__header model-menu__header--ollama">
+            <div class="model-menu__header-title">
+                <svg class="header-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+                </svg>
+                <span>Ollama Cloud (Miễn phí)</span>
+            </div>
+            <span class="model-badge-free">Cloud Free</span>
+        </div>
 
-        <div class="model-option" role="option" aria-selected="false" data-value="edge-female" tabindex="0">
+        <div class="model-option" role="option" aria-selected="false" data-value="gpt20-cloud" data-category="ollama" tabindex="0">
+            <div class="model-option__info">
+                <span class="model-option__name">GPT-OSS 20B Cloud</span>
+                <span class="model-option__desc">OpenAI Open-Weight • Lý luận nhanh</span>
+            </div>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-option" role="option" aria-selected="false" data-value="120b-cloud" data-category="ollama" tabindex="0">
+            <div class="model-option__info">
+                <span class="model-option__name">GPT-OSS 120B Cloud</span>
+                <span class="model-option__desc">OpenAI Flagship MoE • Suy luận sâu</span>
+            </div>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-option" role="option" aria-selected="false" data-value="mistral-nemo" data-category="ollama" tabindex="0">
+            <div class="model-option__info">
+                <span class="model-option__name">Mistral NeMo 12B</span>
+                <span class="model-option__desc">Mistral x NVIDIA • Ngữ cảnh 128k</span>
+            </div>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-option" role="option" aria-selected="false" data-value="phi4-cloud" data-category="ollama" tabindex="0">
+            <div class="model-option__info">
+                <span class="model-option__name">Phi-4 14B Cloud</span>
+                <span class="model-option__desc">Microsoft Research • Toán học &amp; Code</span>
+            </div>
+            <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+
+        <div class="model-menu__divider"></div>
+        <div class="model-menu__header model-menu__header--tts">Chuyển văn bản thành giọng nói (TTS)</div>
+
+        <div class="model-option model-option--tts" role="option" aria-selected="false" data-value="edge-female" data-category="tts" tabindex="0">
             <span class="model-option__name">Edge TTS (Giọng Nữ)</span>
             <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
 
-        <div class="model-option" role="option" aria-selected="false" data-value="edge-male" tabindex="0">
+        <div class="model-option model-option--tts" role="option" aria-selected="false" data-value="edge-male" data-category="tts" tabindex="0">
             <span class="model-option__name">Edge TTS (Giọng Nam)</span>
             <svg class="model-option__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>

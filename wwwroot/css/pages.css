@@ -104,7 +104,7 @@ body.chat-active .main-content {
   align-items: center;
   justify-content: center;
   margin-bottom: 1.25rem;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .chat-standalone-logo:hover {
@@ -365,22 +365,10 @@ body.chat-active .main-content {
   overflow: hidden;
 }
 
-.feature-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(to right, var(--cow-gradient-start), var(--cow-gradient-end));
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
 .feature-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(14, 165, 233, 0.35);
-  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
+  border-color: var(--cow-accent, #38bdf8);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.35);
 }
 
 .feature-card:hover::before {
@@ -658,9 +646,11 @@ body:not(.dark) .chat-bubble-ai pre {
 
 /* Blockquotes inside AI bubble */
 .chat-bubble-ai blockquote {
-  border-left: 3px solid var(--cow-accent);
+  border-left: 1px solid var(--cow-accent);
+  background: rgba(255, 255, 255, 0.03);
   margin: 0.75rem 0;
-  padding: 0.25rem 0 0.25rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
   color: var(--cow-text-muted);
   font-style: italic;
 }
@@ -762,7 +752,7 @@ body:not(.dark) .chat-bubble-ai pre {
   border-radius: 50%;
   background-color: var(--cow-accent);
   display: inline-block;
-  animation: thinkingBounce 1.4s infinite ease-in-out both;
+  animation: thinkingPulse 1.4s infinite ease-in-out both;
   flex-shrink: 0;
 }
 
@@ -789,13 +779,13 @@ body:not(.dark) .chat-bubble-ai pre {
   letter-spacing: normal;
 }
 
-@keyframes thinkingBounce {
-  0%, 80%, 100% {
-    transform: scale(0.6);
-    opacity: 0.4;
+@keyframes thinkingPulse {
+  0%, 100% {
+    transform: scale(0.75);
+    opacity: 0.35;
   }
-  40% {
-    transform: scale(1.1);
+  50% {
+    transform: scale(1);
     opacity: 1;
   }
 }

@@ -124,6 +124,18 @@ public class EdgeTtsClient
             }
         }
 
+        if (socket.State == WebSocketState.Open)
+        {
+            try
+            {
+                await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Done", CancellationToken.None);
+            }
+            catch
+            {
+                // Bỏ qua lỗi đóng socket ở bước kết thúc
+            }
+        }
+
         if (!audioReceived)
         {
             throw new InvalidOperationException("Edge TTS không trả về dữ liệu âm thanh. Vui lòng thử lại sau.");
@@ -232,20 +244,40 @@ public class EdgeTtsClient
     }
 
     /// <summary>
-    /// Loại bỏ ký tự không tương thích và escape XML để nhúng an toàn vào SSML.
+    /// Chuẩn hóa văn bản, loại bỏ markdown/ký tự đặc biệt và escape XML để nhúng an toàn vào SSML.
     /// </summary>
     private static string PrepareText(string text)
     {
-        var builder = new StringBuilder(text.Length);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
 
-        foreach (var ch in text.Replace("\r\n", "\n").Replace('\r', '\n'))
+        // 1. Chuẩn hóa xuống dòng
+        var normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
+
+        // 2. Loại bỏ markdown tiêu đề, in đậm/nghiêng, mã code, gạch đầu dòng
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"(?m)^[ \t]*[-*+]\s+", ", ");
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"(?m)^#+\s+", string.Empty);
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\*\*([^*]+)\*\*", "$1");
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\*([^*]+)\*", "$1");
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"`([^`]+)`", "$1");
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"@([a-zA-Z0-9_\-]+)", "$1");
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"([a-zA-Z0-9_])\/([a-zA-Z0-9_])", "$1 trên $2");
+
+        // 3. Lọc ký tự điều khiển không hợp lệ
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var ch in normalized)
         {
             var code = (int)ch;
             var incompatible = code <= 8 || code is 11 or 12 || (code >= 14 && code <= 31);
             builder.Append(incompatible ? ' ' : ch);
         }
 
-        var cleaned = builder.ToString().Trim();
+        // 4. Thay nhiều dấu xuống dòng hoặc khoảng trắng liền nhau bằng khoảng trắng đơn
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(builder.ToString(), @"\n+", ". ");
+        cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s+", " ").Trim();
+
         return System.Security.SecurityElement.Escape(cleaned) ?? string.Empty;
     }
 }

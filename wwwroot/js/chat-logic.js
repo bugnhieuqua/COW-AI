@@ -313,115 +313,47 @@
 
 
   function renderAudioPlayer(aiBubble, audioUrl, promptText, voiceName, scrollCallback) {
-    aiBubble.innerHTML = '';
+    aiBubble.innerHTML = "";
 
-    const card = document.createElement('div');
-    card.className = 'ai-tts-card';
+    const card = document.createElement("div");
+    card.className = "ai-tts-card";
 
-    const voiceLabel = (voiceName && voiceName.includes('NamMinh')) ? 'Giọng Nam' : 'Giọng Nữ';
+    const voiceLabel = (voiceName && voiceName.includes("NamMinh")) ? "Giọng Nam" : "Giọng Nữ";
 
-    const header = document.createElement('div');
-    header.className = 'ai-tts-card__header';
+    const header = document.createElement("div");
+    header.className = "ai-tts-card__header";
     header.innerHTML = `
       <div class="ai-tts-card__title">
         <span class="ai-tts-card__icon">🎙️</span>
         <span>Bản ghi âm (${voiceLabel})</span>
       </div>
-      <span class="ai-tts-status-badge status-playing">Đang phát...</span>
+      <span class="ai-tts-status-badge status-loading">Đang tạo âm thanh...</span>
     `;
 
-    const promptDiv = document.createElement('div');
-    promptDiv.className = 'ai-tts-card__prompt';
+    const promptDiv = document.createElement("div");
+    promptDiv.className = "ai-tts-card__prompt";
     promptDiv.textContent = promptText;
 
-    const audio = new Audio(audioUrl);
-    currentAudio = audio;
+    const actions = document.createElement("div");
+    actions.className = "ai-tts-card__actions";
 
-    const actions = document.createElement('div');
-    actions.className = 'ai-tts-card__actions';
-
-    const playBtn = document.createElement('button');
-    playBtn.type = 'button';
-    playBtn.className = 'ai-tts-btn btn-play-audio playing';
+    const playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className = "ai-tts-btn btn-play-audio";
+    playBtn.disabled = true;
     playBtn.innerHTML = `
-      <svg class="icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-      <svg class="icon-play hidden" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-      <span class="btn-play-text">Tạm dừng</span>
+      <svg class="icon-pause hidden" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+      <svg class="icon-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+      <span class="btn-play-text">Đang tải...</span>
     `;
 
-    const downloadLink = document.createElement('a');
-    downloadLink.href = audioUrl;
-    downloadLink.download = `cow-ai-audio-${Date.now()}.mp3`;
-    downloadLink.className = 'ai-tts-btn btn-download-audio';
+    const downloadLink = document.createElement("a");
+    downloadLink.className = "ai-tts-btn btn-download-audio disabled";
+    downloadLink.setAttribute("aria-disabled", "true");
     downloadLink.innerHTML = `
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
       <span>Tải xuống MP3</span>
     `;
-
-    const statusBadge = header.querySelector('.ai-tts-status-badge');
-    const iconPause = playBtn.querySelector('.icon-pause');
-    const iconPlay = playBtn.querySelector('.icon-play');
-    const btnPlayText = playBtn.querySelector('.btn-play-text');
-
-    playBtn.addEventListener('click', function (e) {
-      e.preventDefault();
-      if (!audio.paused) {
-        audio.pause();
-      } else {
-        stopSpeaking();
-        currentAudio = audio;
-        audio.play().catch(function (err) {
-          console.warn('[AudioPlayer] Lỗi phát lại:', err);
-        });
-      }
-    });
-
-    audio.onplaying = function () {
-      currentAudio = audio;
-      if (statusBadge) {
-        statusBadge.textContent = 'Đang phát...';
-        statusBadge.className = 'ai-tts-status-badge status-playing';
-      }
-      if (iconPause) iconPause.classList.remove('hidden');
-      if (iconPlay) iconPlay.classList.add('hidden');
-      if (btnPlayText) btnPlayText.textContent = 'Tạm dừng';
-      playBtn.classList.add('playing');
-      if (typeof scrollCallback === 'function') scrollCallback();
-    };
-
-    audio.onpause = function () {
-      if (statusBadge) {
-        statusBadge.textContent = 'Tạm dừng';
-        statusBadge.className = 'ai-tts-status-badge';
-      }
-      if (iconPause) iconPause.classList.add('hidden');
-      if (iconPlay) iconPlay.classList.remove('hidden');
-      if (btnPlayText) btnPlayText.textContent = 'Tiếp tục';
-      playBtn.classList.remove('playing');
-    };
-
-    audio.onended = function () {
-      currentAudio = null;
-      if (statusBadge) {
-        statusBadge.textContent = 'Đã phát xong';
-        statusBadge.className = 'ai-tts-status-badge status-done';
-      }
-      if (iconPause) iconPause.classList.add('hidden');
-      if (iconPlay) iconPlay.classList.remove('hidden');
-      if (btnPlayText) btnPlayText.textContent = 'Nghe lại';
-      playBtn.classList.remove('playing');
-      if (typeof scrollCallback === 'function') scrollCallback();
-    };
-
-    audio.onerror = function () {
-      currentAudio = null;
-      if (statusBadge) {
-        statusBadge.textContent = 'Lỗi phát âm thanh';
-        statusBadge.className = 'ai-tts-status-badge status-error';
-      }
-      if (btnPlayText) btnPlayText.textContent = 'Thử lại';
-      playBtn.classList.remove('playing');
-    };
 
     actions.appendChild(playBtn);
     actions.appendChild(downloadLink);
@@ -431,23 +363,161 @@
     card.appendChild(actions);
     aiBubble.appendChild(card);
 
-    if (typeof scrollCallback === 'function') {
+    if (typeof scrollCallback === "function") {
       scrollCallback();
     }
 
-    const playPromise = audio.play();
-    if (playPromise && typeof playPromise.catch === 'function') {
-      playPromise.catch(function () {
+    const statusBadge = header.querySelector(".ai-tts-status-badge");
+    const iconPause = playBtn.querySelector(".icon-pause");
+    const iconPlay = playBtn.querySelector(".icon-play");
+    const btnPlayText = playBtn.querySelector(".btn-play-text");
+
+    let audio = null;
+    let audioBlobUrl = null;
+
+    async function loadAudio() {
+      try {
         if (statusBadge) {
-          statusBadge.textContent = 'Bấm để nghe';
-          statusBadge.className = 'ai-tts-status-badge';
+          statusBadge.textContent = "Đang tạo âm thanh...";
+          statusBadge.className = "ai-tts-status-badge status-loading";
         }
-        if (iconPause) iconPause.classList.add('hidden');
-        if (iconPlay) iconPlay.classList.remove('hidden');
-        if (btnPlayText) btnPlayText.textContent = 'Phát âm thanh';
-        playBtn.classList.remove('playing');
-      });
+        playBtn.disabled = true;
+        playBtn.classList.remove("playing");
+        if (iconPause) iconPause.classList.add("hidden");
+        if (iconPlay) iconPlay.classList.remove("hidden");
+        if (btnPlayText) btnPlayText.textContent = "Đang tải...";
+
+        const res = await fetch(audioUrl);
+        if (!res.ok) {
+          let errMsg = "Không thể tạo âm thanh.";
+          try {
+            const errJson = await res.json();
+            if (errJson && errJson.error) errMsg = errJson.error;
+          } catch (_) {}
+          throw new Error(errMsg);
+        }
+
+        const blob = await res.blob();
+        if (blob.size < 100) {
+          throw new Error("Dữ liệu âm thanh không hợp lệ.");
+        }
+
+        if (audioBlobUrl) {
+          try { URL.revokeObjectURL(audioBlobUrl); } catch (_) {}
+        }
+        audioBlobUrl = URL.createObjectURL(blob);
+        downloadLink.href = audioBlobUrl;
+        downloadLink.download = `cow-ai-audio-${Date.now()}.mp3`;
+        downloadLink.classList.remove("disabled");
+        downloadLink.removeAttribute("aria-disabled");
+
+        if (audio) {
+          audio.pause();
+          audio.src = "";
+        }
+
+        audio = new Audio(audioBlobUrl);
+        currentAudio = audio;
+
+        playBtn.disabled = false;
+        if (btnPlayText) btnPlayText.textContent = "Phát âm thanh";
+
+        audio.onplaying = function () {
+          currentAudio = audio;
+          if (statusBadge) {
+            statusBadge.textContent = "Đang phát...";
+            statusBadge.className = "ai-tts-status-badge status-playing";
+          }
+          if (iconPause) iconPause.classList.remove("hidden");
+          if (iconPlay) iconPlay.classList.add("hidden");
+          if (btnPlayText) btnPlayText.textContent = "Tạm dừng";
+          playBtn.classList.add("playing");
+          if (typeof scrollCallback === "function") scrollCallback();
+        };
+
+        audio.onpause = function () {
+          if (statusBadge) {
+            statusBadge.textContent = "Tạm dừng";
+            statusBadge.className = "ai-tts-status-badge";
+          }
+          if (iconPause) iconPause.classList.add("hidden");
+          if (iconPlay) iconPlay.classList.remove("hidden");
+          if (btnPlayText) btnPlayText.textContent = "Tiếp tục";
+          playBtn.classList.remove("playing");
+        };
+
+        audio.onended = function () {
+          currentAudio = null;
+          if (statusBadge) {
+            statusBadge.textContent = "Đã phát xong";
+            statusBadge.className = "ai-tts-status-badge status-done";
+          }
+          if (iconPause) iconPause.classList.add("hidden");
+          if (iconPlay) iconPlay.classList.remove("hidden");
+          if (btnPlayText) btnPlayText.textContent = "Nghe lại";
+          playBtn.classList.remove("playing");
+          if (typeof scrollCallback === "function") scrollCallback();
+        };
+
+        audio.onerror = function (err) {
+          console.warn("[AudioPlayer] Lỗi phát âm thanh:", err);
+          if (statusBadge) {
+            statusBadge.textContent = "Lỗi phát âm thanh";
+            statusBadge.className = "ai-tts-status-badge status-error";
+          }
+          if (iconPause) iconPause.classList.add("hidden");
+          if (iconPlay) iconPlay.classList.remove("hidden");
+          if (btnPlayText) btnPlayText.textContent = "Thử lại";
+          playBtn.classList.remove("playing");
+        };
+
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch(function (autoplayErr) {
+            console.log("[AudioPlayer] Tự động phát chờ thao tác người dùng:", autoplayErr);
+            if (statusBadge) {
+              statusBadge.textContent = "Bấm để nghe";
+              statusBadge.className = "ai-tts-status-badge";
+            }
+            if (iconPause) iconPause.classList.add("hidden");
+            if (iconPlay) iconPlay.classList.remove("hidden");
+            if (btnPlayText) btnPlayText.textContent = "Phát âm thanh";
+            playBtn.classList.remove("playing");
+          });
+        }
+      } catch (err) {
+        console.error("[AudioPlayer] Lỗi tạo âm thanh:", err);
+        if (statusBadge) {
+          statusBadge.textContent = "Lỗi tạo âm thanh";
+          statusBadge.className = "ai-tts-status-badge status-error";
+        }
+        playBtn.disabled = false;
+        if (iconPause) iconPause.classList.add("hidden");
+        if (iconPlay) iconPlay.classList.remove("hidden");
+        if (btnPlayText) btnPlayText.textContent = "Thử lại";
+        playBtn.classList.remove("playing");
+      }
     }
+
+    playBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      if (btnPlayText && btnPlayText.textContent === "Thử lại") {
+        loadAudio();
+        return;
+      }
+      if (!audio) return;
+      if (!audio.paused) {
+        audio.pause();
+      } else {
+        stopSpeaking();
+        currentAudio = audio;
+        audio.play().catch(function (err) {
+          console.warn("[AudioPlayer] Lỗi phát lại:", err);
+        });
+      }
+    });
+
+    loadAudio();
   }
 
   async function startChat(customPrompt) {
@@ -1065,12 +1135,29 @@
           : 'Hỏi bất kỳ điều gì hoặc nhập lệnh cho COW.AI...';
       }
 
+      const ttsBanner = document.getElementById('ttsModeNotice');
+      if (ttsBanner) {
+        if (isEdgeTts) {
+          ttsBanner.classList.remove('hidden');
+        } else {
+          ttsBanner.classList.add('hidden');
+        }
+      }
+
       if (isEdgeTts && document.body) {
         document.body.setAttribute(
           'data-tts-voice',
           val === 'edge-male' ? 'vi-VN-NamMinhNeural' : 'vi-VN-HoaiMyNeural'
         );
       }
+    }
+
+    const btnExitTts = document.getElementById('btnExitTtsMode');
+    if (btnExitTts) {
+      btnExitTts.addEventListener('click', function (e) {
+        e.preventDefault();
+        selectModelByValue('gemini');
+      });
     }
 
     window.selectModelByValue = selectModelByValue;
@@ -1221,9 +1308,13 @@
 
       try {
         const activeStyle = document.querySelector('#styleChips .ai-chip.active')?.getAttribute('data-style') || '';
+        const activeRatio = document.querySelector('#ratioChips .ai-chip.active')?.getAttribute('data-ratio') || '1:1';
         let combinedPrompt = promptValue;
         if (activeStyle && activeStyle !== 'photorealistic') {
           combinedPrompt += `, ${activeStyle} style`;
+        }
+        if (activeRatio && activeRatio !== '1:1') {
+          combinedPrompt += ` --ar ${activeRatio}`;
         }
 
         const response = await fetch('/Image/GenerateImage', {
