@@ -1,0 +1,313 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 930" width="100%" height="100%" role="img" aria-label="COW-AI Detailed System Architecture (Excalidraw Animated)">
+  <defs>
+    <!-- Excalidraw-style subtle hand-drawn displacement filter (applied to boxes/lines only, not text) -->
+    <filter id="sketch" x="-2%" y="-2%" width="104%" height="104%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.025" numOctaves="2" seed="7" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+
+    <!-- Dot grid pattern for Excalidraw canvas feel -->
+    <pattern id="dotGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#1e293b" opacity="0.8"/>
+    </pattern>
+
+    <!-- Arrowhead markers -->
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrow-emerald" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#34d399"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#fbbf24"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#a78bfa"/>
+    </marker>
+    <marker id="arrow-rose" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#fb7185"/>
+    </marker>
+
+    <!-- Animated flow paths for animateMotion -->
+    <path id="path-sse" d="M 410 218 L 410 278"/>
+    <path id="path-doc" d="M 650 218 L 650 278"/>
+    <path id="path-tts-top" d="M 960 218 L 960 278"/>
+    <path id="path-hc-intent" d="M 420 432 L 420 492"/>
+    <path id="path-tts-mid" d="M 1030 432 L 1030 492"/>
+    <path id="path-intent-or" d="M 270 668 L 160 732"/>
+    <path id="path-intent-ol" d="M 350 668 L 395 732"/>
+    <path id="path-intent-ddg" d="M 450 668 L 625 732"/>
+    <path id="path-intent-pol" d="M 550 668 L 855 732"/>
+    <path id="path-tts-bing" d="M 1085 668 L 1110 732"/>
+  </defs>
+
+  <style>
+    .font-hand { font-family: 'Virgil', 'Segoe Print', 'Comic Sans MS', cursive, sans-serif; }
+    .font-ui { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .font-mono { font-family: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', ui-monospace, monospace; }
+
+    .flow-line {
+      stroke-dasharray: 8 6;
+      animation: dashFlow 1.4s linear infinite;
+    }
+    .flow-line-slow {
+      stroke-dasharray: 6 6;
+      animation: dashFlow 2.2s linear infinite;
+    }
+    .pulse-dot {
+      animation: pulseGlow 2s ease-in-out infinite;
+    }
+    @keyframes dashFlow {
+      to { stroke-dashoffset: -28; }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.45; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+  </style>
+
+  <!-- Background Canvas -->
+  <rect x="0" y="0" width="1280" height="930" rx="16" fill="#0d1117"/>
+  <rect x="0" y="0" width="1280" height="930" rx="16" fill="url(#dotGrid)"/>
+  <rect x="8" y="8" width="1264" height="914" rx="14" fill="none" stroke="#30363d" stroke-width="1.5" filter="url(#sketch)"/>
+
+  <!-- Header -->
+  <text x="36" y="42" fill="#f8fafc" font-size="22" font-weight="700" class="font-hand">COW-AI · Kiến trúc Hệ thống Chi tiết (ASP.NET Core MVC · net10.0)</text>
+  <text x="36" y="60" fill="#94a3b8" font-size="12" class="font-mono">Runtime: http://localhost:5223  |  Zero Hardcoded Prompts  |  SSE Streaming + Auto-Routing + Edge TTS</text>
+
+  <!-- Legend (Top Right) -->
+  <g transform="translate(885, 22)">
+    <rect x="0" y="0" width="365" height="36" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.2" filter="url(#sketch)"/>
+    <circle cx="18" cy="18" r="4" fill="#38bdf8" class="pulse-dot"/>
+    <text x="28" y="22" fill="#cbd5e1" font-size="11" class="font-mono">SSE Chat</text>
+    <circle cx="102" cy="18" r="4" fill="#34d399" class="pulse-dot"/>
+    <text x="112" y="22" fill="#cbd5e1" font-size="11" class="font-mono">Auto-Route</text>
+    <circle cx="202" cy="18" r="4" fill="#fbbf24" class="pulse-dot"/>
+    <text x="212" y="22" fill="#cbd5e1" font-size="11" class="font-mono">Image</text>
+    <circle cx="268" cy="18" r="4" fill="#fb7185" class="pulse-dot"/>
+    <text x="278" y="22" fill="#cbd5e1" font-size="11" class="font-mono">Edge TTS WS</text>
+  </g>
+
+  <!-- ===================================================================== -->
+  <!-- LAYER 1: CLIENT / BROWSER                                             -->
+  <!-- ===================================================================== -->
+  <rect x="28" y="76" width="1224" height="144" rx="14" fill="#0f172a" fill-opacity="0.75" stroke="#38bdf8" stroke-width="1.6" stroke-dasharray="10 5" filter="url(#sketch)"/>
+  <text x="46" y="99" fill="#38bdf8" font-size="14" font-weight="700" class="font-hand">1. Tầng Giao diện &amp; Client-Side (Views/ · wwwroot/)</text>
+
+  <!-- Box 1.1: Razor Views -->
+  <rect x="46" y="112" width="275" height="92" rx="10" fill="#161b22" stroke="#38bdf8" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="60" y="133" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">Razor Views (Views/)</text>
+  <text x="60" y="152" fill="#94a3b8" font-size="11" class="font-mono">• Home/Index.cshtml (Chat UI)</text>
+  <text x="60" y="168" fill="#94a3b8" font-size="11" class="font-mono">• Document/Summary &amp; CodeGen</text>
+  <text x="60" y="184" fill="#94a3b8" font-size="11" class="font-mono">• Image/Index · _ModelSelector</text>
+
+  <!-- Box 1.2: chat-logic.js & Modules -->
+  <rect x="345" y="112" width="380" height="92" rx="10" fill="#161b22" stroke="#38bdf8" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="360" y="133" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">Client Engine (wwwroot/js/)</text>
+  <text x="360" y="152" fill="#7dd3fc" font-size="11" class="font-mono">• chat-logic.js (SSE EventSource / fetch)</text>
+  <text x="360" y="168" fill="#94a3b8" font-size="11" class="font-mono">• modules/chat-history-store.js (LocalStorage)</text>
+  <text x="360" y="184" fill="#94a3b8" font-size="11" class="font-mono">• modules/file-attachment.js · voice-input.js</text>
+
+  <!-- Box 1.3: Renderers & Audio -->
+  <rect x="749" y="112" width="484" height="92" rx="10" fill="#161b22" stroke="#fb7185" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="764" y="133" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">Rendering, WebGL &amp; Audio Playback</text>
+  <text x="764" y="152" fill="#94a3b8" font-size="11" class="font-mono">• three-background.js (Three.js Canvas 60 FPS)</text>
+  <text x="764" y="168" fill="#94a3b8" font-size="11" class="font-mono">• marked.min.js + Prism.js (Markdown &amp; Syntax Highlight)</text>
+  <text x="764" y="184" fill="#fda4af" font-size="11" class="font-mono">• HTML5 &lt;audio&gt; Player (/Home/StreamChat &amp; /api/tts/speak)</text>
+
+  <!-- ===================================================================== -->
+  <!-- LAYER 2: ASP.NET CORE MVC PIPELINE                                    -->
+  <!-- ===================================================================== -->
+  <rect x="28" y="276" width="1224" height="158" rx="14" fill="#0f172a" fill-opacity="0.75" stroke="#a78bfa" stroke-width="1.6" stroke-dasharray="10 5" filter="url(#sketch)"/>
+  <text x="46" y="299" fill="#a78bfa" font-size="14" font-weight="700" class="font-hand">2. Tầng ASP.NET Core MVC &amp; Pipeline (Program.cs · Controllers/)</text>
+
+  <!-- Box 2.1: Program.cs -->
+  <rect x="46" y="312" width="230" height="106" rx="10" fill="#161b22" stroke="#a78bfa" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="60" y="333" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">Program.cs (Bootstrap)</text>
+  <text x="60" y="352" fill="#c4b5fd" font-size="11" class="font-mono">• Load Key.env / .env</text>
+  <text x="60" y="368" fill="#94a3b8" font-size="11" class="font-mono">• DI &amp; HttpClient Pool</text>
+  <text x="60" y="384" fill="#94a3b8" font-size="11" class="font-mono">  - Ollama: 120s timeout</text>
+  <text x="60" y="400" fill="#94a3b8" font-size="11" class="font-mono">  - PollinationsText: 25s</text>
+
+  <!-- Box 2.2: HomeController -->
+  <rect x="294" y="312" width="285" height="106" rx="10" fill="#161b22" stroke="#38bdf8" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="308" y="333" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">HomeController</text>
+  <text x="308" y="352" fill="#7dd3fc" font-size="11" class="font-mono">• GET /Home/Index</text>
+  <text x="308" y="368" fill="#7dd3fc" font-size="11" class="font-mono">• /Home/StreamChat (SSE / MP3)</text>
+  <text x="308" y="384" fill="#fbbf24" font-size="11" class="font-mono">• /Home/GenerateImage</text>
+  <text x="308" y="400" fill="#94a3b8" font-size="11" class="font-mono">• /Home/Error</text>
+
+  <!-- Box 2.3: DocumentController -->
+  <rect x="597" y="312" width="245" height="106" rx="10" fill="#161b22" stroke="#34d399" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="611" y="333" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">DocumentController</text>
+  <text x="611" y="352" fill="#94a3b8" font-size="11" class="font-mono">• Summary() · CodeGen()</text>
+  <text x="611" y="368" fill="#6ee7b7" font-size="11" class="font-mono">• /Document/StreamSummary</text>
+  <text x="611" y="384" fill="#6ee7b7" font-size="11" class="font-mono">• /Document/StreamCodeGen</text>
+  <text x="611" y="400" fill="#94a3b8" font-size="11" class="font-mono">  (SSE token streaming)</text>
+
+  <!-- Box 2.4: ImageController -->
+  <rect x="860" y="312" width="180" height="106" rx="10" fill="#161b22" stroke="#fbbf24" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="874" y="333" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">ImageController</text>
+  <text x="874" y="352" fill="#94a3b8" font-size="11" class="font-mono">• /Image/Index</text>
+  <text x="874" y="368" fill="#fcd34d" font-size="11" class="font-mono">• /Image/GenerateImage</text>
+  <text x="874" y="384" fill="#94a3b8" font-size="11" class="font-mono">  (Dịch prompt +</text>
+  <text x="874" y="400" fill="#94a3b8" font-size="11" class="font-mono">   tạo ảnh AI)</text>
+
+  <!-- Box 2.5: TtsController -->
+  <rect x="1058" y="312" width="176" height="106" rx="10" fill="#161b22" stroke="#fb7185" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="1072" y="333" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">TtsController</text>
+  <text x="1072" y="352" fill="#fda4af" font-size="11" class="font-mono">• GET /api/tts/speak</text>
+  <text x="1072" y="368" fill="#94a3b8" font-size="11" class="font-mono">  ?text=...&amp;voice=...</text>
+  <text x="1072" y="384" fill="#94a3b8" font-size="11" class="font-mono">• Stream audio/mpeg</text>
+  <text x="1072" y="400" fill="#94a3b8" font-size="11" class="font-mono">  hoặc JSON 500</text>
+
+  <!-- ===================================================================== -->
+  <!-- LAYER 3: CORE ORCHESTRATION, PROMPTS & TTS FACADE                     -->
+  <!-- ===================================================================== -->
+  <rect x="28" y="492" width="1224" height="178" rx="14" fill="#0f172a" fill-opacity="0.75" stroke="#34d399" stroke-width="1.6" stroke-dasharray="10 5" filter="url(#sketch)"/>
+  <text x="46" y="515" fill="#34d399" font-size="14" font-weight="700" class="font-hand">3. Tầng Điều phối Thông minh, Dynamic Prompts &amp; TTS Facade (Services/ · Prompts/)</text>
+
+  <!-- Box 3.1: IntentDispatcherService -->
+  <rect x="46" y="528" width="465" height="126" rx="10" fill="#161b22" stroke="#34d399" stroke-width="1.6" filter="url(#sketch)"/>
+  <text x="62" y="550" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">IntentDispatcherService (Singleton)</text>
+  <text x="62" y="570" fill="#6ee7b7" font-size="11" class="font-mono">• ResolveAutoModel(prompt):</text>
+  <text x="74" y="586" fill="#cbd5e1" font-size="11" class="font-mono">Code/Bug/SQL → deepseek | Tóm tắt/Dịch → llama3 | Mặc định → gemini</text>
+  <text x="62" y="606" fill="#fcd34d" font-size="11" class="font-mono">• DetectImageIntent(prompt, model, out cleanPrompt):</text>
+  <text x="74" y="622" fill="#cbd5e1" font-size="11" class="font-mono">Nhận diện /image hoặc model pollinations; loại trừ UML/Mermaid/Code</text>
+  <text x="62" y="640" fill="#94a3b8" font-size="11" class="font-mono">• Hỗ trợ ép ngữ cảnh tìm kiếm DuckDuckGo khi chọn model duckduckgo</text>
+
+  <!-- Box 3.2: PromptService + Prompts/ -->
+  <rect x="530" y="528" width="335" height="126" rx="10" fill="#161b22" stroke="#fbbf24" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="545" y="550" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">PromptService (Transient) ← Prompts/</text>
+  <text x="545" y="570" fill="#fcd34d" font-size="11" class="font-mono">• AutoRoutingKeywords.json</text>
+  <text x="545" y="586" fill="#94a3b8" font-size="11" class="font-mono">• CodeGeneration.txt</text>
+  <text x="545" y="602" fill="#94a3b8" font-size="11" class="font-mono">• DocumentSummary.json</text>
+  <text x="545" y="618" fill="#94a3b8" font-size="11" class="font-mono">• ImageGeneration.txt</text>
+  <text x="545" y="634" fill="#94a3b8" font-size="11" class="font-mono">• PromptTranslation.txt (+ Fallback)</text>
+
+  <!-- Box 3.3: TTS Facade -->
+  <rect x="884" y="528" width="350" height="126" rx="10" fill="#161b22" stroke="#fb7185" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="899" y="550" fill="#e2e8f0" font-size="13" font-weight="700" class="font-ui">Edge TTS Facade &amp; DRM Layer</text>
+  <text x="899" y="570" fill="#fda4af" font-size="11" class="font-mono">• ITtsService → TtsService (Scoped)</text>
+  <text x="899" y="588" fill="#cbd5e1" font-size="11" class="font-mono">• EdgeTtsService → EdgeTtsClient (Singleton)</text>
+  <text x="899" y="606" fill="#94a3b8" font-size="11" class="font-mono">• EdgeTtsDrm.GenerateSecMsGec()</text>
+  <text x="899" y="624" fill="#94a3b8" font-size="11" class="font-mono">• Resilient Voice Fallback:</text>
+  <text x="911" y="640" fill="#94a3b8" font-size="11" class="font-mono">vi-VN-HoaiMyNeural / NamMinhNeural</text>
+
+  <!-- ===================================================================== -->
+  <!-- LAYER 4: EXTERNAL AI, SEARCH, IMAGE & TTS PROVIDERS                   -->
+  <!-- ===================================================================== -->
+  <rect x="28" y="732" width="1224" height="170" rx="14" fill="#0f172a" fill-opacity="0.75" stroke="#fbbf24" stroke-width="1.6" stroke-dasharray="10 5" filter="url(#sketch)"/>
+  <text x="46" y="755" fill="#fbbf24" font-size="14" font-weight="700" class="font-hand">4. Tầng Nhà cung cấp AI, Tìm kiếm &amp; Tổng hợp giọng nói (External &amp; Local Services)</text>
+
+  <!-- Box 4.1: OpenRouterService -->
+  <rect x="46" y="768" width="225" height="118" rx="10" fill="#161b22" stroke="#38bdf8" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="60" y="790" fill="#7dd3fc" font-size="13" font-weight="700" class="font-ui">OpenRouterService</text>
+  <text x="60" y="808" fill="#94a3b8" font-size="11" class="font-mono">openrouter.ai/api/v1</text>
+  <text x="60" y="826" fill="#cbd5e1" font-size="11" class="font-mono">• Gemini 2.0 Flash</text>
+  <text x="60" y="842" fill="#cbd5e1" font-size="11" class="font-mono">• DeepSeek R1 (Code)</text>
+  <text x="60" y="858" fill="#cbd5e1" font-size="11" class="font-mono">• Llama 3 · OmniRoute</text>
+  <text x="60" y="874" fill="#64748b" font-size="10" class="font-mono">SSE Stream</text>
+
+  <!-- Box 4.2: OllamaService -->
+  <rect x="286" y="768" width="225" height="118" rx="10" fill="#161b22" stroke="#a78bfa" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="300" y="790" fill="#c4b5fd" font-size="13" font-weight="700" class="font-ui">OllamaService</text>
+  <text x="300" y="808" fill="#94a3b8" font-size="11" class="font-mono">Cloud: ollama.com/v1</text>
+  <text x="300" y="824" fill="#94a3b8" font-size="11" class="font-mono">Local: localhost:11434/v1</text>
+  <text x="300" y="842" fill="#cbd5e1" font-size="11" class="font-mono">• gpt-oss:20b / 120b</text>
+  <text x="300" y="858" fill="#cbd5e1" font-size="11" class="font-mono">• phi4 · mistral-nemo</text>
+  <text x="300" y="874" fill="#64748b" font-size="10" class="font-mono">Cloud + Local Fallback</text>
+
+  <!-- Box 4.3: DuckDuckGoService -->
+  <rect x="526" y="768" width="205" height="118" rx="10" fill="#161b22" stroke="#34d399" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="540" y="790" fill="#6ee7b7" font-size="13" font-weight="700" class="font-ui">DuckDuckGoService</text>
+  <text x="540" y="808" fill="#94a3b8" font-size="11" class="font-mono">Live Web Search</text>
+  <text x="540" y="826" fill="#cbd5e1" font-size="11" class="font-mono">• Trích xuất kết quả</text>
+  <text x="540" y="842" fill="#cbd5e1" font-size="11" class="font-mono">  thực tế &amp; nguồn link</text>
+  <text x="540" y="858" fill="#cbd5e1" font-size="11" class="font-mono">• Không cần API Key</text>
+  <text x="540" y="874" fill="#64748b" font-size="10" class="font-mono">HTTP Scrape / Extract</text>
+
+  <!-- Box 4.4: PollinationsService -->
+  <rect x="746" y="768" width="245" height="118" rx="10" fill="#161b22" stroke="#fbbf24" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="760" y="790" fill="#fcd34d" font-size="13" font-weight="700" class="font-ui">PollinationsService</text>
+  <text x="760" y="808" fill="#94a3b8" font-size="11" class="font-mono">image.pollinations.ai/prompt</text>
+  <text x="760" y="826" fill="#cbd5e1" font-size="11" class="font-mono">• Dịch prompt (Pollinations</text>
+  <text x="760" y="842" fill="#cbd5e1" font-size="11" class="font-mono">  Text / Google Translate)</text>
+  <text x="760" y="858" fill="#cbd5e1" font-size="11" class="font-mono">• Sinh ảnh chất lượng cao</text>
+  <text x="760" y="874" fill="#64748b" font-size="10" class="font-mono">Singleton + Named HttpClient</text>
+
+  <!-- Box 4.5: Microsoft Edge TTS -->
+  <rect x="1006" y="768" width="228" height="118" rx="10" fill="#161b22" stroke="#fb7185" stroke-width="1.5" filter="url(#sketch)"/>
+  <text x="1020" y="790" fill="#fda4af" font-size="13" font-weight="700" class="font-ui">Microsoft Edge TTS</text>
+  <text x="1020" y="808" fill="#94a3b8" font-size="11" class="font-mono">wss://speech.platform.</text>
+  <text x="1020" y="824" fill="#94a3b8" font-size="11" class="font-mono">      bing.com:443</text>
+  <text x="1020" y="842" fill="#cbd5e1" font-size="11" class="font-mono">• SSML + Sec-MS-GEC</text>
+  <text x="1020" y="858" fill="#cbd5e1" font-size="11" class="font-mono">• Stream audio/mpeg</text>
+  <text x="1020" y="874" fill="#64748b" font-size="10" class="font-mono">WebSocket Binary Frames</text>
+
+  <!-- ===================================================================== -->
+  <!-- ANIMATED CONNECTIONS & MOVING DATA PACKETS                            -->
+  <!-- ===================================================================== -->
+
+  <!-- Layer 1 -> Layer 2 -->
+  <path d="M 410 218 L 410 278" fill="none" stroke="#38bdf8" stroke-width="2" class="flow-line" marker-end="url(#arrow-cyan)"/>
+  <rect x="356" y="236" width="108" height="18" rx="4" fill="#0d1117" stroke="#38bdf8" stroke-width="0.8"/>
+  <text x="410" y="249" text-anchor="middle" fill="#7dd3fc" font-size="10" class="font-mono">SSE / StreamChat</text>
+
+  <path d="M 650 218 L 650 278" fill="none" stroke="#34d399" stroke-width="2" class="flow-line" marker-end="url(#arrow-emerald)"/>
+  <rect x="606" y="236" width="88" height="18" rx="4" fill="#0d1117" stroke="#34d399" stroke-width="0.8"/>
+  <text x="650" y="249" text-anchor="middle" fill="#6ee7b7" font-size="10" class="font-mono">Doc / CodeGen</text>
+
+  <path d="M 960 218 L 960 278" fill="none" stroke="#fb7185" stroke-width="2" class="flow-line" marker-end="url(#arrow-rose)"/>
+  <rect x="910" y="236" width="100" height="18" rx="4" fill="#0d1117" stroke="#fb7185" stroke-width="0.8"/>
+  <text x="960" y="249" text-anchor="middle" fill="#fda4af" font-size="10" class="font-mono">Audio / Image</text>
+
+  <!-- Layer 2 -> Layer 3 -->
+  <path d="M 420 432 L 420 492" fill="none" stroke="#34d399" stroke-width="2" class="flow-line" marker-end="url(#arrow-emerald)"/>
+  <rect x="364" y="451" width="112" height="18" rx="4" fill="#0d1117" stroke="#34d399" stroke-width="0.8"/>
+  <text x="420" y="464" text-anchor="middle" fill="#6ee7b7" font-size="10" class="font-mono">Dispatch Intent</text>
+
+  <path d="M 695 432 L 695 492" fill="none" stroke="#fbbf24" stroke-width="2" class="flow-line-slow" marker-end="url(#arrow-amber)"/>
+  <rect x="646" y="451" width="98" height="18" rx="4" fill="#0d1117" stroke="#fbbf24" stroke-width="0.8"/>
+  <text x="695" y="464" text-anchor="middle" fill="#fcd34d" font-size="10" class="font-mono">Load Prompts</text>
+
+  <path d="M 1030 432 L 1030 492" fill="none" stroke="#fb7185" stroke-width="2" class="flow-line" marker-end="url(#arrow-rose)"/>
+  <rect x="980" y="451" width="100" height="18" rx="4" fill="#0d1117" stroke="#fb7185" stroke-width="0.8"/>
+  <text x="1030" y="464" text-anchor="middle" fill="#fda4af" font-size="10" class="font-mono">ITtsService</text>
+
+  <!-- Layer 3 -> Layer 4 -->
+  <path d="M 270 668 L 160 732" fill="none" stroke="#38bdf8" stroke-width="2" class="flow-line" marker-end="url(#arrow-cyan)"/>
+  <path d="M 350 668 L 395 732" fill="none" stroke="#a78bfa" stroke-width="2" class="flow-line" marker-end="url(#arrow-violet)"/>
+  <path d="M 450 668 L 625 732" fill="none" stroke="#34d399" stroke-width="2" class="flow-line" marker-end="url(#arrow-emerald)"/>
+  <path d="M 550 668 L 855 732" fill="none" stroke="#fbbf24" stroke-width="2" class="flow-line" marker-end="url(#arrow-amber)"/>
+  <path d="M 1085 668 L 1110 732" fill="none" stroke="#fb7185" stroke-width="2" class="flow-line" marker-end="url(#arrow-rose)"/>
+
+  <!-- Animated Moving Data Packets (SMIL animateMotion) -->
+  <circle r="4" fill="#38bdf8">
+    <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#path-sse"/></animateMotion>
+  </circle>
+  <circle r="4" fill="#34d399">
+    <animateMotion dur="2.1s" repeatCount="indefinite"><mpath href="#path-hc-intent"/></animateMotion>
+  </circle>
+  <circle r="4" fill="#38bdf8">
+    <animateMotion dur="2.0s" repeatCount="indefinite"><mpath href="#path-intent-or"/></animateMotion>
+  </circle>
+  <circle r="3.5" fill="#a78bfa">
+    <animateMotion dur="2.3s" repeatCount="indefinite"><mpath href="#path-intent-ol"/></animateMotion>
+  </circle>
+  <circle r="3.5" fill="#34d399">
+    <animateMotion dur="2.5s" repeatCount="indefinite"><mpath href="#path-intent-ddg"/></animateMotion>
+  </circle>
+  <circle r="4" fill="#fbbf24">
+    <animateMotion dur="2.2s" repeatCount="indefinite"><mpath href="#path-intent-pol"/></animateMotion>
+  </circle>
+  <circle r="4" fill="#fb7185">
+    <animateMotion dur="1.7s" repeatCount="indefinite"><mpath href="#path-tts-top"/></animateMotion>
+  </circle>
+  <circle r="4" fill="#fb7185">
+    <animateMotion dur="1.7s" begin="0.4s" repeatCount="indefinite"><mpath href="#path-tts-mid"/></animateMotion>
+  </circle>
+  <circle r="4" fill="#fb7185">
+    <animateMotion dur="1.7s" begin="0.8s" repeatCount="indefinite"><mpath href="#path-tts-bing"/></animateMotion>
+  </circle>
+</svg>

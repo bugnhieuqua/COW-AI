@@ -6,51 +6,9 @@
 
 ## 1. Kiến trúc hệ thống & Luồng xử lý
 
-### 1.1. Kiến trúc tổng quan
+### 1.1. Kiến trúc tổng quan (Excalidraw Animated SVG)
 
-```mermaid
-flowchart TD
-    UI["Trình duyệt (chat-logic.js, Three.js, Prism/Marked)"]
-
-    subgraph ASPNET["ASP.NET Core MVC (localhost:5223)"]
-        HC["HomeController (/Home/StreamChat, /Home/GenerateImage)"]
-        DC["DocumentController (/Document/StreamSummary, /Document/StreamCodeGen)"]
-        IC["ImageController (/Image/GenerateImage)"]
-        TC["TtsController (/api/tts/speak)"]
-
-        ID["IntentDispatcherService (Auto-Routing & Image Intent)"]
-        PS["PromptService (Prompts/*.txt, *.json)"]
-        TTSF["ITtsService -> TtsService -> EdgeTtsService / EdgeTtsClient"]
-    end
-
-    subgraph Providers["Dịch vụ AI & Bên ngoài"]
-        OR["OpenRouterService (Gemini, DeepSeek R1, Llama 3)"]
-        OL["OllamaService (Ollama Cloud / Local :11434)"]
-        DDG["DuckDuckGoService (Tìm kiếm Web)"]
-        POL["PollinationsService (Sinh ảnh & Dịch prompt)"]
-        BING["Microsoft Edge TTS (wss://speech.platform.bing.com)"]
-    end
-
-    UI -->|"SSE / Audio / REST"| HC
-    UI -->|"SSE"| DC
-    UI -->|"REST"| IC
-    UI -->|"GET audio/mpeg"| TC
-
-    HC --> ID
-    HC --> PS
-    DC --> PS
-    TC --> TTSF
-
-    ID -->|"Chat / Code / Tóm tắt"| OR
-    ID -->|"Model Ollama"| OL
-    ID -->|"Search"| DDG
-    ID -->|"Tạo ảnh / /image"| POL
-    HC -->|"Model edge-male / edge-female"| TTSF
-
-    DC --> OR
-    IC --> POL
-    TTSF -->|"WebSocket + Sec-MS-GEC"| BING
-```
+![COW-AI System Architecture](assets/architecture.svg)
 
 ### 1.2. Luồng Chat, Auto-Routing & Streaming (SSE / TTS)
 
