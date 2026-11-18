@@ -1,15 +1,29 @@
-# Antigravity agents
+# Antigravity agents & local memory tools
 .agent/
 .agents/
 .backup_agents_skills/
 .codex/
 .impeccable/
+skills-lock.json
+mo-giao-dien-bo-nho.cmd
+mo-giao-dien-bo-nho.vbs
+tat-bo-nho.cmd
 
+# Reference / unrelated repositories & UI prototypes
 ai-chat-ui/
+free-ChatGPT/
+drift/
+
 # Build and Output directories
 bin/
 obj/
 out/
+
+# Logs & temporary files
+logs/
+*.log
+.DS_Store
+Thumbs.db
 
 # User Secrets & Environment
 secrets.json
@@ -25,6 +39,3 @@ Key.env
 *.user
 *.suo
 docs/
-# Reference repository (cloned at step 11.1)
-free-ChatGPT/
-*.env
