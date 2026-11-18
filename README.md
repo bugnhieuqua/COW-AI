@@ -1,11 +1,96 @@
-# COW-AI — Vận hành & Xử lý sự cố
+# COW-AI
 
-Ứng dụng ASP.NET Core (net10.0) chạy mặc định tại `http://localhost:5223`
-(xem `Properties/launchSettings.json`).
+Ứng dụng trợ lý AI đa mô hình xây dựng trên **ASP.NET Core MVC (`net10.0`)**, chạy mặc định tại `http://localhost:5223` (xem `Properties/launchSettings.json`). Hỗ trợ chat streaming (SSE), tự động điều phối mô hình theo ngữ cảnh, tìm kiếm web, sinh ảnh, tóm tắt/sinh mã nguồn và đọc văn bản tiếng Việt (Edge TTS).
 
 ---
 
-## 1. Chạy / dừng server
+## 1. Kiến trúc hệ thống & Luồng xử lý
+
+### 1.1. Kiến trúc tổng quan
+
+```mermaid
+flowchart TD
+    UI["Trình duyệt (chat-logic.js, Three.js, Prism/Marked)"]
+
+    subgraph ASPNET["ASP.NET Core MVC (localhost:5223)"]
+        HC["HomeController (/Home/StreamChat, /Home/GenerateImage)"]
+        DC["DocumentController (/Document/StreamSummary, /Document/StreamCodeGen)"]
+        IC["ImageController (/Image/GenerateImage)"]
+        TC["TtsController (/api/tts/speak)"]
+
+        ID["IntentDispatcherService (Auto-Routing & Image Intent)"]
+        PS["PromptService (Prompts/*.txt, *.json)"]
+        TTSF["ITtsService -> TtsService -> EdgeTtsService / EdgeTtsClient"]
+    end
+
+    subgraph Providers["Dịch vụ AI & Bên ngoài"]
+        OR["OpenRouterService (Gemini, DeepSeek R1, Llama 3)"]
+        OL["OllamaService (Ollama Cloud / Local :11434)"]
+        DDG["DuckDuckGoService (Tìm kiếm Web)"]
+        POL["PollinationsService (Sinh ảnh & Dịch prompt)"]
+        BING["Microsoft Edge TTS (wss://speech.platform.bing.com)"]
+    end
+
+    UI -->|"SSE / Audio / REST"| HC
+    UI -->|"SSE"| DC
+    UI -->|"REST"| IC
+    UI -->|"GET audio/mpeg"| TC
+
+    HC --> ID
+    HC --> PS
+    DC --> PS
+    TC --> TTSF
+
+    ID -->|"Chat / Code / Tóm tắt"| OR
+    ID -->|"Model Ollama"| OL
+    ID -->|"Search"| DDG
+    ID -->|"Tạo ảnh / /image"| POL
+    HC -->|"Model edge-male / edge-female"| TTSF
+
+    DC --> OR
+    IC --> POL
+    TTSF -->|"WebSocket + Sec-MS-GEC"| BING
+```
+
+### 1.2. Luồng Chat, Auto-Routing & Streaming (SSE / TTS)
+
+```mermaid
+sequenceDiagram
+    actor U as Người dùng
+    participant FE as chat-logic.js
+    participant HC as HomeController.StreamChat
+    participant ID as IntentDispatcherService
+    participant AI as AI Provider (OpenRouter / Ollama / DDG / Pollinations / EdgeTTS)
+
+    U->>FE: Nhập prompt + chọn model
+    alt Model là edge-male / edge-female
+        FE->>HC: new Audio("/Home/StreamChat?prompt=...&model=edge-*")
+        HC->>AI: EdgeTtsService.StreamToResponseAsync()
+        AI-->>HC: Luồng MP3 (audio/mpeg)
+        HC-->>FE: Phát trực tiếp trên thẻ <audio>
+    else Chat / Tìm kiếm / Tạo ảnh
+        FE->>HC: EventSource / fetch SSE (/Home/StreamChat)
+        HC->>ID: Kiểm tra DetectImageIntent & ResolveAutoModel
+        alt Ý định tạo ảnh (/image hoặc model pollinations)
+            ID-->>HC: cleanPrompt
+            HC->>AI: PollinationsService (dịch prompt + tạo ảnh)
+            AI-->>HC: URL / dữ liệu ảnh
+        else Tìm kiếm web (duckduckgo)
+            HC->>AI: DuckDuckGoService tìm kết quả trực tiếp
+        else Hội thoại / Code / Tóm tắt (auto / openrouter / ollama)
+            ID-->>HC: Chọn deepseek (code), llama3 (tóm tắt) hoặc gemini
+            HC->>AI: Stream token từ OpenRouterService / OllamaService
+        end
+        AI-->>HC: Chunk dữ liệu
+        HC-->>FE: SSE events (hiển thị Markdown + Highlight code)
+    end
+```
+
+---
+
+# Vận hành & Xử lý sự cố
+
+## 2. Chạy / dừng server
 
 ```powershell
 # Chạy server (từ thư mục D:\COW-AI)
@@ -89,7 +174,7 @@ Invoke-WebRequest "http://localhost:5223/" -UseBasicParsing -TimeoutSec 10 | Sel
 
 ---
 
-## 2. Lỗi "Không thể phát âm thanh. Vui lòng thử lại sau ít phút."
+## 3. Lỗi "Không thể phát âm thanh. Vui lòng thử lại sau ít phút."
 
 Chuỗi thông báo này nằm ở `wwwroot/js/chat-logic.js` (hàm `handleTtsError`, dòng ~419-447).
 Nó là thông báo **chung**, hiển thị cho mọi lỗi của thẻ `<audio>`, gồm cả lỗi phía server
