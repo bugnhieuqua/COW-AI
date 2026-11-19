@@ -51,6 +51,126 @@ public class IntentDispatcherService
     }
 
     /// <summary>
+    /// Nhận diện ý định tạo ảnh cục bộ trên GPU (qua lệnh /imags hoặc chọn model local-image / sdxl-turbo).
+    /// </summary>
+    public bool DetectLocalImageIntent(string prompt, string? model, out string cleanPrompt)
+    {
+        cleanPrompt = prompt?.Trim() ?? string.Empty;
+        var normalizedModel = model?.Trim().ToLowerInvariant();
+
+        // 1. Người dùng chủ động chọn model Local Image (SDXL Turbo)
+        if (normalizedModel is "local-image" or "sdxl-turbo" or "local-sd" or "imags")
+        {
+            StripLocalImageSlashCommand(ref cleanPrompt);
+            if (string.IsNullOrWhiteSpace(cleanPrompt))
+            {
+                cleanPrompt = prompt?.Trim() ?? string.Empty;
+            }
+            return true;
+        }
+
+        // 2. Người dùng gõ lệnh /imags (hoặc /localimg, /localimage)
+        if (StripLocalImageSlashCommand(ref cleanPrompt))
+        {
+            if (string.IsNullOrWhiteSpace(cleanPrompt))
+            {
+                cleanPrompt = prompt?.Trim() ?? string.Empty;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool StripLocalImageSlashCommand(ref string prompt)
+    {
+        string[] localCommands = ["/imags", "/localimg", "/localimage"];
+        foreach (var cmd in localCommands)
+        {
+            if (prompt.StartsWith(cmd + " ", StringComparison.OrdinalIgnoreCase))
+            {
+                prompt = prompt.Substring(cmd.Length + 1).Trim();
+                return true;
+            }
+            if (prompt.StartsWith(cmd + ":", StringComparison.OrdinalIgnoreCase))
+            {
+                prompt = prompt.Substring(cmd.Length + 1).Trim();
+                return true;
+            }
+            if (string.Equals(prompt, cmd, StringComparison.OrdinalIgnoreCase))
+            {
+                prompt = string.Empty;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Nhận diện kỹ năng lập trình chuyên sâu (/code, /dev, /laptrinh).
+    /// </summary>
+    public bool DetectCodeSkillIntent(string prompt, out string cleanPrompt)
+    {
+        cleanPrompt = prompt?.Trim() ?? string.Empty;
+        string[] codeCommands = ["/code", "/dev", "/laptrinh"];
+        foreach (var cmd in codeCommands)
+        {
+            if (cleanPrompt.StartsWith(cmd + " ", StringComparison.OrdinalIgnoreCase) ||
+                cleanPrompt.StartsWith(cmd + ":", StringComparison.OrdinalIgnoreCase))
+            {
+                cleanPrompt = cleanPrompt.Substring(cmd.Length + 1).Trim();
+                return !string.IsNullOrWhiteSpace(cleanPrompt);
+            }
+            if (cleanPrompt.StartsWith(cmd + "\n", StringComparison.OrdinalIgnoreCase))
+            {
+                cleanPrompt = cleanPrompt.Substring(cmd.Length + 1).Trim();
+                return !string.IsNullOrWhiteSpace(cleanPrompt);
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Nhận diện kỹ năng tìm kiếm web (/search, /tim, /web hoặc chọn model duckduckgo).
+    /// </summary>
+    public bool DetectSearchSkillIntent(string prompt, string? model, out string cleanQuery)
+    {
+        cleanQuery = prompt?.Trim() ?? string.Empty;
+        if (string.Equals(model?.Trim(), "duckduckgo", StringComparison.OrdinalIgnoreCase))
+        {
+            StripSearchSlashCommand(ref cleanQuery);
+            return true;
+        }
+
+        if (StripSearchSlashCommand(ref cleanQuery))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool StripSearchSlashCommand(ref string prompt)
+    {
+        string[] searchCommands = ["/search", "/tim", "/web"];
+        foreach (var cmd in searchCommands)
+        {
+            if (prompt.StartsWith(cmd + " ", StringComparison.OrdinalIgnoreCase) ||
+                prompt.StartsWith(cmd + ":", StringComparison.OrdinalIgnoreCase))
+            {
+                prompt = prompt.Substring(cmd.Length + 1).Trim();
+                return true;
+            }
+            if (string.Equals(prompt, cmd, StringComparison.OrdinalIgnoreCase))
+            {
+                prompt = string.Empty;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Nhận diện ý định tạo ảnh từ người dùng (qua model lựa chọn, slash command hoặc từ khóa tự nhiên).
     /// </summary>
     public bool DetectImageIntent(string prompt, string? model)
@@ -87,8 +207,10 @@ public class IntentDispatcherService
             return true;
         }
 
-        // Nếu người dùng chủ động chọn DuckDuckGo Search, không tự động chuyển sang tạo ảnh trừ khi có slash command (/image, ...)
-        if (string.Equals(model?.Trim(), "duckduckgo", StringComparison.OrdinalIgnoreCase))
+        // Nếu người dùng chủ động chọn DuckDuckGo Search hoặc gọi các kỹ năng khác (/code, /search, /tts), không tự động chuyển sang tạo ảnh
+        if (string.Equals(model?.Trim(), "duckduckgo", StringComparison.OrdinalIgnoreCase) ||
+            DetectCodeSkillIntent(cleanPrompt, out _) ||
+            StripSearchSlashCommand(ref cleanPrompt))
         {
             return false;
         }

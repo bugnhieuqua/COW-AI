@@ -1,0 +1,68 @@
+[
+  {
+    "command": "/imags",
+    "aliases": ["/localimg", "/localimage"],
+    "name": "Tạo ảnh Local GPU",
+    "badge": "RTX 4060",
+    "badgeType": "local",
+    "category": "featured",
+    "categoryLabel": "Kỹ năng chính",
+    "icon": "image-gpu",
+    "description": "Sinh ảnh cục bộ bằng SDXL Turbo ngay trên GPU (Offline 100%, 2–5 giây)",
+    "placeholder": "Mô tả ảnh cần vẽ trên GPU Local (ví dụ: chú bò đeo kính râm trên bãi biển 16:9)...",
+    "example": "/imags chú bò đeo kính râm trên bãi biển"
+  },
+  {
+    "command": "/code",
+    "aliases": ["/dev", "/laptrinh"],
+    "name": "Lập trình chuyên sâu",
+    "badge": "Code Pro",
+    "badgeType": "code",
+    "category": "featured",
+    "categoryLabel": "Kỹ năng chính",
+    "icon": "code",
+    "description": "Sinh mã nguồn sạch, tối ưu thuật toán theo chuẩn Markdown kèm nút Sao chép",
+    "placeholder": "Nhập yêu cầu lập trình (ví dụ: viết API ASP.NET Core hoặc thuật toán Dijkstra bằng Python)...",
+    "example": "/code viết hàm C# kiểm tra số nguyên tố tối ưu"
+  },
+  {
+    "command": "/image",
+    "aliases": ["/img", "/draw", "/ve"],
+    "name": "Tạo ảnh Cloud",
+    "badge": "Pollinations",
+    "badgeType": "cloud",
+    "category": "builtin",
+    "categoryLabel": "Kỹ năng mở rộng",
+    "icon": "image-cloud",
+    "description": "Tạo ảnh nghệ thuật trực tuyến qua Pollinations AI (tự dịch Việt → Anh)",
+    "placeholder": "Mô tả ảnh nghệ thuật cần tạo qua Pollinations Cloud...",
+    "example": "/image tranh sơn dầu phố cổ Hội An về đêm"
+  },
+  {
+    "command": "/search",
+    "aliases": ["/tim", "/web"],
+    "name": "Tìm kiếm Web",
+    "badge": "DuckDuckGo",
+    "badgeType": "cloud",
+    "category": "builtin",
+    "categoryLabel": "Kỹ năng mở rộng",
+    "icon": "search",
+    "description": "Tra cứu thông tin trực tiếp trên web qua DuckDuckGo",
+    "placeholder": "Nhập từ khóa cần tra cứu trên web...",
+    "example": "/search .NET 10 new features"
+  },
+  {
+    "command": "/tts",
+    "aliases": ["/speak", "/doc"],
+    "name": "Đọc giọng nói tiếng Việt",
+    "badge": "Edge TTS",
+    "badgeType": "audio",
+    "category": "builtin",
+    "categoryLabel": "Kỹ năng mở rộng",
+    "icon": "audio",
+    "description": "Chuyển văn bản thành giọng đọc tiếng Việt tự nhiên kèm trình phát & tải MP3",
+    "placeholder": "Nhập văn bản tiếng Việt cần đọc thành giọng nói...",
+    "example": "/tts Xin chào, tôi là trợ lý COW AI"
+  }
+]
+

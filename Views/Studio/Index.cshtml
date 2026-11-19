@@ -1,0 +1,1124 @@
+@model COW_AI.Models.Project
+@{
+    Layout = "_StudioLayout";
+    var activeProject = Model;
+    var projects = ViewData["Projects"] as List<COW_AI.Models.Project> ?? new List<COW_AI.Models.Project>();
+    var isAuthenticated = (bool)(ViewData["IsAuthenticated"] ?? false);
+    var activeView = (string)(ViewData["ActiveView"] ?? "hub");
+    var hasScenes = activeProject.Scenes.Count > 0;
+    var totalSeconds = hasScenes ? activeProject.Scenes.Sum(s => s.DurationSeconds > 0 ? s.DurationSeconds : 5) : 0;
+    var totalTimeText = TimeSpan.FromSeconds(totalSeconds).ToString(@"mm\:ss");
+    ViewData["Title"] = activeView == "editor" ? $"{activeProject.Title} - COW.AI Studio" : "COW.AI Studio - Không gian Sáng tạo Video Bài Giảng AI";
+}
+
+@section Head {
+    <!-- Quy tắc SEO chuẩn: Khu vực Workspace cá nhân đặt noindex bảo vệ quyền riêng tư -->
+    <meta name="robots" content="noindex, nofollow" />
+}
+
+<div id="studioContainer" class="studio-root-container view-mode-@activeView" data-project-id="@activeProject.Id" data-authenticated="@(isAuthenticated ? "true" : "false")" data-active-view="@activeView" data-active-project-id="@activeProject.Id">
+
+    <!-- =========================================================================
+         1. IN-PAGE AUTH MODAL WITH MONOCHROME CLOSE BUTTON [X]
+         ========================================================================= -->
+    <div id="studioAuthModal" class="studio-auth-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="studioAuthTitle">
+        <div class="studio-auth-box">
+            <!-- NÚT DẤU X ĐÓNG CÔNG THÁI HỌC -->
+            <button type="button" id="btnCloseAuthModal" class="btn-auth-modal-close" title="Đóng cửa sổ" aria-label="Đóng">&times;</button>
+            
+            <div class="studio-auth-box__header">
+                <div class="auth-brand-badge">
+                    <img src="~/images/logo.png" alt="COW.AI" width="20" height="20" class="studio-auth-logo" style="object-fit: contain;" />
+                    <span class="auth-brand-badge__title">COW.AI Studio</span>
+                </div>
+                <h2 id="studioAuthTitle" class="studio-auth-title">Đăng nhập</h2>
+            </div>
+
+            <!-- Tab Chuyển Đăng nhập / Đăng ký (Segmented Control) -->
+            <div class="studio-auth-tabs" role="tablist">
+                <button type="button" class="studio-auth-tab active" id="tabAuthLogin" role="tab" aria-selected="true">Đăng nhập</button>
+                <button type="button" class="studio-auth-tab" id="tabAuthRegister" role="tab" aria-selected="false">Đăng ký mới</button>
+            </div>
+
+            <div id="authAlertError" class="auth-alert-box hidden" role="alert"></div>
+
+            <!-- Form Đăng nhập -->
+            <form id="formStudioLogin" class="studio-auth-form" onsubmit="handleStudioLogin(event)">
+                <div class="form-group">
+                    <label for="studioLoginUser" class="form-label">Tên đăng nhập hoặc Email</label>
+                    <input type="text" id="studioLoginUser" class="form-control" placeholder="Nhập tên đăng nhập" required autocomplete="username" aria-describedby="authAlertError" />
+                </div>
+                <div class="form-group">
+                    <label for="studioLoginPass" class="form-label">Mật khẩu</label>
+                    <div class="studio-password-wrapper">
+                        <input type="password" id="studioLoginPass" class="form-control" placeholder="••••••••" required autocomplete="current-password" aria-describedby="authAlertError" />
+                        <button type="button" class="btn-toggle-eye" onclick="togglePasswordVisibility('studioLoginPass', this)" title="Hiện/ẩn mật khẩu" aria-label="Hiện/ẩn mật khẩu">
+                            <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <svg class="eye-closed hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                        </button>
+                    </div>
+                </div>
+                <button type="submit" id="btnSubmitStudioLogin" class="btn-studio-submit-auth">
+                    <span>Đăng nhập</span>
+                </button>
+            </form>
+
+            <!-- Form Đăng ký -->
+            <form id="formStudioRegister" class="studio-auth-form hidden" onsubmit="handleStudioRegister(event)">
+                <div class="form-group">
+                    <label for="studioRegUser" class="form-label">Tên tài khoản mới</label>
+                    <input type="text" id="studioRegUser" class="form-control" placeholder="vidu: giangvien_ai" required autocomplete="username" aria-describedby="authAlertError" />
+                </div>
+                <div class="form-group">
+                    <label for="studioRegEmail" class="form-label">Địa chỉ Email</label>
+                    <input type="email" id="studioRegEmail" class="form-control" placeholder="giangvien@example.com" required autocomplete="email" aria-describedby="authAlertError" />
+                </div>
+                <div class="form-group">
+                    <label for="studioRegPass" class="form-label">Mật khẩu (tối thiểu 6 ký tự)</label>
+                    <div class="studio-password-wrapper">
+                        <input type="password" id="studioRegPass" class="form-control" placeholder="••••••••" required autocomplete="new-password" aria-describedby="authAlertError" />
+                        <button type="button" class="btn-toggle-eye" onclick="togglePasswordVisibility('studioRegPass', this)" title="Hiện/ẩn mật khẩu" aria-label="Hiện/ẩn mật khẩu">
+                            <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <svg class="eye-closed hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="studioRegPassConfirm" class="form-label">Xác nhận mật khẩu</label>
+                    <div class="studio-password-wrapper">
+                        <input type="password" id="studioRegPassConfirm" class="form-control" placeholder="••••••••" required autocomplete="new-password" aria-describedby="authAlertError" />
+                        <button type="button" class="btn-toggle-eye" onclick="togglePasswordVisibility('studioRegPassConfirm', this)" title="Hiện/ẩn mật khẩu" aria-label="Hiện/ẩn mật khẩu">
+                            <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <svg class="eye-closed hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                        </button>
+                    </div>
+                </div>
+                <button type="submit" id="btnSubmitStudioRegister" class="btn-studio-submit-auth">
+                    <span>Tạo tài khoản & Đăng nhập</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- =========================================================================
+         2. STUDIO HUB VIEW (Hình 1 & 3: Monochromatic Black & White Hub)
+         ========================================================================= -->
+    <div id="studioHubView" class="studio-hub-container @(activeView == "hub" ? "active" : "")">
+        <div id="hubSidebarBackdrop" class="hub-sidebar-backdrop" aria-hidden="true"></div>
+        <!-- Sidebar Bên Trái Hub -->
+        <aside id="studioHubSidebar" class="studio-hub-sidebar" aria-label="Điều hướng Studio Hub">
+            <div class="studio-hub-brand">
+                <img src="~/images/logo.png" alt="COW.AI" width="22" height="22" class="studio-hub-logo" />
+                <span class="studio-hub-title">COW.AI STUDIO</span>
+            </div>
+
+            <!-- NÚT NỔI BẬT: + TẠO MỚI (Hình 1 - B&W Minimalist) -->
+            <div class="studio-create-wrapper">
+                <button type="button" id="btnHubCreateNew" class="btn-hub-create" aria-haspopup="true" aria-expanded="false">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>Tạo mới</span>
+                </button>
+
+                <!-- POPOVER 3 CỘT CHUẨN CAPCUT (Hình 3) -->
+                <div id="studioCreatePopoverBackdrop" class="studio-popover-backdrop hidden" onclick="triggerCreateNew()"></div>
+                <div id="studioCreatePopover" class="studio-create-popover hidden" role="dialog" aria-label="Tùy chọn tạo bài giảng mới">
+                    <!-- Cột 1: Video -->
+                    <div class="popover-column">
+                        <div class="popover-column__title">Video</div>
+                        <button type="button" class="popover-option" onclick="handleCreateOption('blank', '16:9')">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"></rect></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label">Bảng vẽ trống</div>
+                                <div class="popover-option__desc">Tự do sáng tạo từng phân cảnh</div>
+                            </div>
+                        </button>
+                        <button type="button" class="popover-option" onclick="handleCreateOption('aspect', '16:9')">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label">16:9 Ngang</div>
+                                <div class="popover-option__desc">YouTube, Bài giảng máy chiếu</div>
+                            </div>
+                        </button>
+                        <button type="button" class="popover-option" onclick="handleCreateOption('aspect', '9:16')">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"></rect></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label">9:16 Dọc</div>
+                                <div class="popover-option__desc">TikTok, Shorts bài giảng ngắn</div>
+                            </div>
+                        </button>
+                        <button type="button" class="popover-option" onclick="handleCreateOption('aspect', '1:1')">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label">1:1 Vuông</div>
+                                <div class="popover-option__desc">Instagram, Mạng xã hội</div>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- Cột 2: Nạp tài liệu học tập -->
+                    <div class="popover-column">
+                        <div class="popover-column__title">Nạp tài liệu học tập</div>
+                        <button type="button" class="popover-option" onclick="triggerDocumentUpload('.pdf')">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label">Tệp PDF</div>
+                                <div class="popover-option__desc">Giáo trình, tài liệu số hóa</div>
+                            </div>
+                        </button>
+                        <button type="button" class="popover-option" onclick="triggerDocumentUpload('.pptx')">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label">Slide PPTX</div>
+                                <div class="popover-option__desc">Thuyết trình PowerPoint có sẵn</div>
+                            </div>
+                        </button>
+                        <button type="button" class="popover-option" onclick="triggerDocumentUpload('.docx')">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label">Tài liệu Word (DOCX)</div>
+                                <div class="popover-option__desc">Giáo án, đề cương chi tiết</div>
+                            </div>
+                        </button>
+                        <button type="button" class="popover-option" onclick="triggerDocumentUpload('.txt,.md')">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="12" y2="17"></line></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label">Văn bản TXT / MD</div>
+                                <div class="popover-option__desc">Nội dung tóm tắt, markdown</div>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- Cột 3: Công cụ AI bài giảng -->
+                    <div class="popover-column">
+                        <div class="popover-column__title">Công cụ AI bài giảng</div>
+                        <button type="button" class="popover-option" onclick="openPlanModalFromHub()">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label-row">
+                                    <span class="popover-option__label">Auto-Video từ tài liệu</span>
+                                    <span class="popover-badge">Mới</span>
+                                </div>
+                                <div class="popover-option__desc">AI phân tích dàn ý & tạo phân cảnh</div>
+                            </div>
+                        </button>
+                        <button type="button" class="popover-option" onclick="openEditorWithVoice()">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label-row">
+                                    <span class="popover-option__label">VieNeu TTS Studio</span>
+                                    <span class="popover-badge">48kHz</span>
+                                </div>
+                                <div class="popover-option__desc">Thuyết minh giọng Bắc/Nam chuẩn</div>
+                            </div>
+                        </button>
+                        <button type="button" class="popover-option" onclick="openPlanModalFromHub()">
+                            <div class="popover-option__icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                            </div>
+                            <div class="popover-option__info">
+                                <div class="popover-option__label-row">
+                                    <span class="popover-option__label">Tạo phụ đề tự động</span>
+                                    <span class="popover-badge">Mới</span>
+                                </div>
+                                <div class="popover-option__desc">Khớp mốc thời gian phụ đề chuẩn xác</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menu sidebar Hub -->
+            <nav class="studio-hub-nav">
+                <div class="studio-hub-nav__section-title">CHỨC NĂNG CHÍNH</div>
+                <button type="button" class="studio-hub-nav__item active">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    <span>Trang chủ Studio</span>
+                </button>
+                <button type="button" class="studio-hub-nav__item" onclick="openPlanModalFromHub()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    <span>Studio bài giảng từ tài liệu</span>
+                </button>
+                <button type="button" class="studio-hub-nav__item" onclick="openEditorWithVoice()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>
+                    <span>Studio giọng nói VieNeu</span>
+                </button>
+
+                <div class="studio-hub-nav__section-title">QUẢN LÝ BÀI GIẢNG</div>
+                <button type="button" class="studio-hub-nav__item" onclick="scrollToProjectsSection()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    <span>Dự án của tôi (@projects.Count)</span>
+                </button>
+
+                <div class="studio-hub-nav__spacer"></div>
+                <a href="/" class="studio-hub-nav__item studio-hub-nav__item--exit">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <span>Quay về Trang chủ COW.AI</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Khối Chính Hub (Main Hub Content) -->
+        <main class="studio-hub-main">
+            <!-- Header Hub (Sleek B&W) -->
+            <header class="studio-hub-header">
+                <div class="studio-hub-header__left">
+                    <button type="button" id="btnHubMobileSidebarToggle" class="btn-hub-mobile-menu" aria-label="Mở menu Studio Hub" aria-expanded="false" aria-controls="studioHubSidebar" title="Menu Studio">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    </button>
+                    <div class="studio-hub-header__search">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="inputHubSearch" placeholder="Tìm kiếm bài giảng, tài liệu..." oninput="handleHubSearch(this.value)" />
+                    </div>
+                </div>
+                <div class="studio-hub-header__actions">
+                    <button type="button" id="btnHubThemeToggle" class="btn-hub-icon" title="Chuyển giao diện Sáng / Tối">
+                        <svg class="icon-theme" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    </button>
+                    @if (isAuthenticated)
+                    {
+                        <div class="hub-account-badge">
+                            <span class="user-avatar-badge">@(User.Identity?.Name?.Substring(0, 1).ToUpper() ?? "U")</span>
+                            <span class="user-name">@(User.Identity?.Name ?? "Thành viên")</span>
+                            <form asp-controller="Account" asp-action="Logout" method="post" class="studio-logout-form">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="returnUrl" value="/studio" />
+                                <button type="submit" class="btn-hub-logout" title="Đăng xuất" aria-label="Đăng xuất">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                                </button>
+                            </form>
+                        </div>
+                    }
+                    else
+                    {
+                        <button type="button" id="btnHubOpenLogin" class="btn-hub-login" onclick="openStudioLoginModal()">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+                            <span>Đăng nhập</span>
+                        </button>
+                    }
+                </div>
+            </header>
+
+            <!-- Hub Body Scrollable -->
+            <div class="studio-hub-body">
+                <!-- HERO BANNER (Hình 1 - B&W Minimalist) -->
+                <section class="hub-hero-section">
+                    <h1 class="hub-hero-title">Tạo Video Bài Giảng</h1>
+                    
+                    <!-- Hero Prompt Box -->
+                    <div class="hub-hero-box">
+                        <textarea id="hubPromptInput" class="hub-hero-textarea" placeholder="Nhập dàn ý, nội dung bài giảng hoặc kéo thả tài liệu (PDF, PPTX, Word, TXT) để AI tự động chuyển hóa thành kịch bản đa phân cảnh..."></textarea>
+                        
+                        <div class="hub-hero-box__footer">
+                            <div class="hub-hero-box__left">
+                                <button type="button" class="btn-hub-box-tool" onclick="document.getElementById('hubFileInputHidden').click()" title="Đính kèm tệp tài liệu">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                    <span>Nạp tài liệu</span>
+                                </button>
+                                <input type="file" id="hubFileInputHidden" accept=".pdf,.pptx,.docx,.txt,.md" style="display:none;" onchange="handleHubFileSelect(this)" />
+                                <span id="hubFileBadge" class="hub-file-badge hidden"></span>
+
+                                <select id="hubVoiceSelect" class="hub-voice-select">
+                                    <option value="Hải Đăng">Giọng: Hải Đăng (Nam MB)</option>
+                                    <option value="Hoài My">Giọng: Hoài My (Nữ MB)</option>
+                                    <option value="Lan Nhi">Giọng: Lan Nhi (Nữ MN)</option>
+                                    <option value="Nam Minh">Giọng: Nam Minh (Nam MN)</option>
+                                    <option value="Bình">Giọng: Bình (Nam MT)</option>
+                                </select>
+                            </div>
+
+                            <button type="button" id="btnHubSubmitPrompt" class="btn-hub-box-submit" onclick="submitHubPrompt()" title="Tạo bài giảng">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TÍNH NĂNG PHỔ BIẾN (Cards B&W) -->
+                <section class="hub-features-section">
+                    <h2 class="hub-section-title">Tính năng phổ biến</h2>
+                    <div class="hub-features-grid">
+                        <div class="hub-feature-card" onclick="handleCreateOption('blank', '16:9')">
+                            <div class="hub-feature-card__icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                            </div>
+                            <div class="hub-feature-card__title">Trình chỉnh sửa video</div>
+                        </div>
+
+                        <div class="hub-feature-card" onclick="openPlanModalFromHub()">
+                            <div class="hub-feature-card__icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                            </div>
+                            <div class="hub-feature-card__title">Studio tạo video bài giảng</div>
+                        </div>
+
+                        <div class="hub-feature-card" onclick="openEditorWithVoice()">
+                            <div class="hub-feature-card__icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>
+                            </div>
+                            <div class="hub-feature-card__title">Studio giọng nói VieNeu</div>
+                        </div>
+
+                        <div class="hub-feature-card" onclick="handleCreateOption('aspect', '9:16')">
+                            <div class="hub-feature-card__icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"></rect><line x1="9" y1="18" x2="15" y2="18"></line></svg>
+                            </div>
+                            <div class="hub-feature-card__title">Video ngắn Shorts 9:16</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- DỰ ÁN BÀI GIẢNG GẦN ĐÂY (Recent Projects Grid B&W) -->
+                <section id="sectionRecentProjects" class="hub-projects-section">
+                    <div class="hub-projects-header">
+                        <div class="hub-projects-header__left">
+                            <h2 class="hub-section-title">Dự án gần đây (<span id="hubProjectsCount">@projects.Count</span>)</h2>
+                            <div class="hub-bulk-actions @(projects.Count > 0 && isAuthenticated ? "" : "hidden")" id="hubProjectsBulkActions">
+                                <label class="bulk-select-all-label">
+                                    <input type="checkbox" id="checkSelectAllProjects" onchange="toggleSelectAllProjects(this)" />
+                                    <span>Chọn tất cả</span>
+                                </label>
+                                <button type="button" id="btnDeleteSelectedProjects" class="btn-hub-bulk-delete hidden" onclick="deleteSelectedProjects()">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    <span id="btnDeleteSelectedText">Xóa đã chọn (<span id="selectedProjectsCount">0</span>)</span>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-hub-new-inline" onclick="triggerCreateNew()">+ Bài giảng mới</button>
+                    </div>
+
+                    <div id="hubProjectsGrid" class="hub-projects-grid">
+                        @if (projects.Count > 0)
+                        {
+                            @foreach (var p in projects)
+                            {
+                                <div class="hub-project-card" data-project-id="@p.Id" data-title="@p.Title.ToLower()">
+                                    <div class="hub-project-card__thumb" onclick="openProjectInEditor(@p.Id)">
+                                        <label class="project-checkbox-label" onclick="event.stopPropagation()">
+                                            <input type="checkbox" class="project-card-checkbox" data-project-id="@p.Id" onchange="updateSelectedProjectsState()" />
+                                        </label>
+                                        <div class="hub-project-card__thumb-canvas">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+                                        </div>
+                                        <span class="hub-project-badge-scenes">@p.Scenes.Count cảnh</span>
+                                        <span class="hub-project-badge-status status-@p.Status.ToLower()">@p.Status</span>
+                                    </div>
+                                    <div class="hub-project-card__body">
+                                        <div class="hub-project-card__title" onclick="openProjectInEditor(@p.Id)" title="@p.Title">@p.Title</div>
+                                        <div class="hub-project-card__meta">
+                                            <span>Giọng: @p.Voice</span> · <span>@p.UpdatedAt.ToString("dd/MM/yyyy")</span>
+                                        </div>
+                                        <div class="hub-project-card__actions">
+                                            <button type="button" class="btn-hub-open-editor" onclick="openProjectInEditor(@p.Id)">Mở biên tập ➔</button>
+                                            <button type="button" class="btn-hub-delete-proj" onclick="deleteProjectHub(@p.Id, '@p.Title')" title="Xóa dự án">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="hub-projects-empty">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                @if (isAuthenticated)
+                                {
+                                    <p>Bạn chưa có bài giảng nào. Nhấp "+ Tạo mới" để bắt đầu nạp tài liệu.</p>
+                                    <button type="button" class="btn-hub-create-inline" onclick="triggerCreateNew()">+ Tạo bài giảng đầu tiên</button>
+                                }
+                                else
+                                {
+                                    <p>Đăng nhập để lưu trữ và quản lý các dự án video bài giảng của bạn.</p>
+                                    <button type="button" class="btn-hub-create-inline" onclick="openStudioLoginModal()">Đăng nhập ngay</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+
+    <!-- =========================================================================
+         3. VIDEO EDITOR VIEW (Hình 2: CapCut Editor Workspace B&W)
+         ========================================================================= -->
+    <div id="studioEditorView" class="studio-editor-container @(activeView == "editor" ? "active" : "")">
+        <!-- TOP-BAR CHUẨN CAPCUT TRONG TRÌNH BIÊN TẬP -->
+        <header class="studio-header studio-panel-header" role="banner">
+            <!-- Góc trái: Nút Quay lại Hub + Logo Studio -->
+            <div class="studio-header__brand-group">
+                <button type="button" id="btnBackToHub" class="btn-back-hub" onclick="switchToHubView()" title="Quay về trang Studio Hub">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    <span>Studio Hub</span>
+                </button>
+
+                <div class="studio-menu-wrapper">
+                    <button type="button" id="btnStudioMainMenu" class="btn-studio-menu" title="Menu bài giảng">
+                        <img src="~/images/logo.png" alt="COW.AI" width="18" height="18" class="studio-brand-logo" />
+                        <span class="studio-brand-title">Biên tập</span>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div id="studioMainDropdown" class="studio-dropdown-menu">
+                        <button type="button" class="studio-dropdown-item" onclick="switchToHubView()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                            <span>Quay về Studio Hub</span>
+                        </button>
+                        <button type="button" id="btnNewProject" class="studio-dropdown-item" onclick="triggerCreateNew()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            <span>Tạo bài giảng mới</span>
+                        </button>
+                        <button type="button" class="studio-dropdown-item" onclick="document.getElementById('btnOpenPlanModal').click()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            <span>Nạp tệp tài liệu (PDF, PPTX, DOCX)</span>
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button type="button" id="btnDeleteCurrentProject" class="studio-dropdown-item studio-dropdown-item--danger" title="Xóa dự án hiện tại">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            <span>Xóa dự án này</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ở giữa: Tiêu đề bài giảng (Editable) + Huy hiệu trạng thái -->
+            <div class="studio-header__center">
+                <h1 id="studioProjectTitle" class="studio-header__title" contenteditable="true" title="Bấm để chỉnh sửa tên bài giảng">@activeProject.Title</h1>
+                <span id="studioBadgeStatus" class="studio-status-pill status-@activeProject.Status.ToLower()">@activeProject.Status</span>
+                <span class="studio-header__scenes-count">@activeProject.Scenes.Count cảnh</span>
+            </div>
+
+            <!-- Góc phải: 1 nút phụ Kế hoạch AI + 1 nút chính Xuất video (gom gọn), Theme & Tài khoản -->
+            <div class="studio-header__actions">
+                <button type="button" id="btnOpenPlanModal" class="btn-studio-action btn-studio-action--secondary" title="Nạp tài liệu & lập kế hoạch phân cảnh tự động">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    <span>Kế hoạch AI</span>
+                </button>
+
+                <div class="studio-export-wrapper">
+                    <button type="button" id="btnStudioExportMenu" class="btn-studio-action btn-studio-action--primary" aria-haspopup="true" aria-expanded="false" aria-controls="studioExportDropdown" title="Xuất video MP4, xem trước Composition hoặc xuất offline">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Xuất video</span>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+
+                    <div id="studioExportDropdown" class="studio-dropdown-menu studio-dropdown-menu--right studio-export-dropdown" role="menu" aria-label="Tùy chọn xuất video">
+                        <div class="studio-export-dropdown__section">
+                            <label for="studioRenderModeSelect" class="studio-export-dropdown__label">Công cụ Render MP4</label>
+                            <select id="studioRenderModeSelect" class="studio-render-mode-select w-full" title="Chế độ xuất MP4" aria-label="Chế độ xuất MP4">
+                                <option value="fast" selected>FFmpeg Nhanh (NVENC · Phụ đề ASS)</option>
+                                <option value="hyperframes">HyperFrames 3-Zone (GSAP)</option>
+                            </select>
+                            <button type="button" id="btnRenderBackendVideo" class="btn-studio-action btn-studio-action--accent w-full" title="Xuất 1 video MP4 thống nhất (hình động, phụ đề, SFX & nhạc nền)">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                                    <line x1="7" y1="2" x2="7" y2="22"></line>
+                                    <line x1="17" y1="2" x2="17" y2="22"></line>
+                                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                                </svg>
+                                <span>Render MP4 (Server)</span>
+                            </button>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <button type="button" id="btnOpenPreview" class="studio-dropdown-item" title="Xem composition HyperFrames">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            <span>Xem Composition</span>
+                        </button>
+                        <button type="button" id="btnExportVideo" class="studio-dropdown-item" title="Xuất video Offline (MediaRecorder)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span>Xuất Client (Offline)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Thẻ ẩn tương thích test cũ -->
+                <button type="button" id="btnOpenScriptModal" class="hidden" style="display:none;" aria-hidden="true"></button>
+                <button type="button" id="btnAutoProduceAll" class="hidden" style="display:none;" aria-hidden="true"></button>
+
+                <div class="header-actions-divider"></div>
+
+                <!-- Nút chuyển đổi Theme Sáng / Tối -->
+                <button type="button" id="studioThemeToggleBtn" class="btn-studio-theme-toggle" title="Đổi giao diện Sáng / Tối">
+                    <svg class="icon-theme" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </button>
+
+                <!-- Menu Tài khoản Dropdown -->
+                <div class="studio-account-wrapper">
+                    @if (isAuthenticated)
+                    {
+                        <button type="button" id="btnStudioAccountMenu" class="btn-studio-account" title="Tài khoản @User.Identity?.Name">
+                            <span class="user-avatar-badge">@(User.Identity?.Name?.Substring(0, 1).ToUpper() ?? "U")</span>
+                            <span class="user-name-label">@User.Identity?.Name</span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div id="studioAccountDropdown" class="studio-dropdown-menu studio-dropdown-menu--right">
+                            <div class="dropdown-user-header">
+                                <div class="user-full-name">@User.Identity?.Name</div>
+                                <div class="user-role-badge">@(User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "Member")</div>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a href="/Account/Profile" class="studio-dropdown-item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                <span>Hồ sơ cá nhân</span>
+                            </a>
+                            <button type="button" class="studio-dropdown-item" onclick="switchToHubView()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                                <span>Trang chủ Studio</span>
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <form asp-controller="Account" asp-action="Logout" method="post" class="studio-logout-form studio-logout-form--menu">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="returnUrl" value="/studio" />
+                                <button type="submit" class="studio-dropdown-item studio-dropdown-item--danger">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                                    <span>Đăng xuất</span>
+                                </button>
+                            </form>
+                        </div>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn-studio-login" onclick="openStudioLoginModal()">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+                            <span>Đăng nhập</span>
+                        </button>
+                    }
+                </div>
+            </div>
+        </header>
+
+        <!-- WORKSPACE 3 KHU VỰC: CỘT TRÁI (PANEL), SÂN KHẤU GIỮA (STAGE) & TIMELINE ĐÁY -->
+        <div class="studio-bento-grid studio-app-container">
+            <!-- CỘT PANEL BÊN TRÁI (LEFT PANEL TÍCH HỢP TAB CHUẨN CAPCUT) -->
+            <aside class="studio-sidebar" role="region" aria-label="Bảng điều khiển và danh sách phân cảnh">
+                <!-- Bộ Tabs chuyển đổi thanh mảnh chuẩn CapCut -->
+                <div class="studio-sidebar-tabs" role="tablist">
+                    <button type="button" class="studio-sidebar-tab active" id="tabNavScenes" role="tab" aria-selected="true" aria-controls="paneScenes" title="Kịch bản phân cảnh">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+                        <span>Phân cảnh</span>
+                    </button>
+                    <button type="button" class="studio-sidebar-tab" id="tabNavAssets" role="tab" aria-selected="false" aria-controls="paneAssets" title="Dự án và tệp tài liệu">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                        <span>Dự án & Nguồn</span>
+                    </button>
+                    <button type="button" class="studio-sidebar-tab" id="tabNavCopilot" role="tab" aria-selected="false" aria-controls="paneCopilot" title="Trợ lý AI Studio">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                        <span>Trợ lý AI</span>
+                    </button>
+                </div>
+
+                <!-- KHU VỰC NỘI DUNG TƯƠNG ỨNG VỚI TAB -->
+                <div class="studio-sidebar-content">
+                    <!-- PANE 1: PHÂN CẢNH KỊCH BẢN -->
+                    <div id="paneScenes" class="studio-tab-pane active" role="tabpanel" aria-labelledby="tabNavScenes">
+                        <div class="studio-panel-actions">
+                            <span class="studio-panel-title">Phân cảnh kịch bản (@activeProject.Scenes.Count cảnh)</span>
+                            <button type="button" id="btnAddScene" class="btn-studio-action btn-studio-action--ghost btn-sm" title="Thêm phân cảnh mới">+ Thêm cảnh</button>
+                        </div>
+
+                        <div id="scenesList" class="studio-scenes-list" data-active-project-id="@activeProject.Id">
+                            @if (activeProject.Scenes.Count == 0)
+                            {
+                                <div class="studio-scenes-empty" id="scenesEmptyState">
+                                    <p>Chưa có phân cảnh nào.</p>
+                                    <button type="button" class="btn-studio-action btn-studio-action--primary w-full" onclick="document.getElementById('btnOpenPlanModal').click()">
+                                        <span>Mở Kế hoạch Auto-Video</span>
+                                    </button>
+                                </div>
+                            }
+                            @for (int i = 0; i < activeProject.Scenes.Count; i++)
+                            {
+                                var scene = activeProject.Scenes[i];
+                                <div class="scene-item @(i == 0 ? "active" : "")" 
+                                     data-scene-id="@scene.Id" 
+                                     data-order="@scene.OrderIndex"
+                                     data-duration="@scene.DurationSeconds"
+                                     data-image-url="@(scene.ImageUrl ?? "")"
+                                     data-audio-url="@(scene.AudioUrl ?? "")"
+                                     data-anim="@(scene.AnimationEffect ?? "zoom-in")"
+                                     data-filter="@(scene.FilterPreset ?? "normal")"
+                                     data-sub-pos="@(scene.SubtitlePosition ?? "bottom")">
+                                    <div class="scene-item__header">
+                                        <div class="scene-item__meta">
+                                            <span class="scene-badge">Cảnh @(scene.OrderIndex + 1)</span>
+                                            <span class="scene-title-text" contenteditable="true" title="Bấm để sửa tiêu đề cảnh">@scene.Title</span>
+                                        </div>
+                                        <div class="scene-item__controls">
+                                            <span class="scene-duration">@(scene.DurationSeconds.ToString("0.#"))s</span>
+                                            <button type="button" class="btn-delete-scene" title="Xóa phân cảnh" onclick="deleteSceneItem(@scene.Id, event)">✕</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="scene-item__body">
+                                        <label class="scene-field-label">Lời thoại thuyết minh</label>
+                                        <textarea class="scene-narration-input" rows="2" placeholder="Nhập lời giảng thuyết minh cho phân cảnh này...">@scene.Content</textarea>
+
+                                        <label class="scene-field-label">Prompt hình ảnh (SDXL Turbo)</label>
+                                        <input type="text" class="scene-prompt-input" value="@scene.ImagePrompt" placeholder="Mô tả hình ảnh trực quan..." />
+
+                                        <!-- ACCORDION THUỘC TÍNH NÂNG CAO (Tier 16) -->
+                                        <details class="scene-props-details scene-properties-details">
+                                            <summary class="scene-props-summary">⚙ Thuộc tính & Hiệu ứng chuyển động</summary>
+                                            <div class="scene-props-grid">
+                                                <div class="scene-prop-group">
+                                                    <label class="scene-prop-label">Hiệu ứng</label>
+                                                    <select class="scene-prop-select animationEffect">
+                                                        <option value="zoom-in" selected="@(scene.AnimationEffect == "zoom-in")">Zoom In (Phóng to)</option>
+                                                        <option value="zoom-out" selected="@(scene.AnimationEffect == "zoom-out")">Zoom Out (Thu nhỏ)</option>
+                                                        <option value="pan-left" selected="@(scene.AnimationEffect == "pan-left")">Pan Trái</option>
+                                                        <option value="pan-right" selected="@(scene.AnimationEffect == "pan-right")">Pan Phải</option>
+                                                        <option value="fade" selected="@(scene.AnimationEffect == "fade")">Fade (Mờ dần)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="scene-prop-group">
+                                                    <label class="scene-prop-label">Bộ lọc</label>
+                                                    <select class="scene-prop-select filterPreset">
+                                                        <option value="normal" selected="@(scene.FilterPreset == "normal")">Chuẩn (Normal)</option>
+                                                        <option value="warm" selected="@(scene.FilterPreset == "warm")">Ấm áp (Warm)</option>
+                                                        <option value="cool" selected="@(scene.FilterPreset == "cool")">Mát mẻ (Cool)</option>
+                                                        <option value="noir" selected="@(scene.FilterPreset == "noir")">Điện ảnh (Noir)</option>
+                                                        <option value="cyberpunk" selected="@(scene.FilterPreset == "cyberpunk")">Công nghệ (Cyber)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="scene-prop-group">
+                                                    <label class="scene-prop-label">Vị trí phụ đề</label>
+                                                    <select class="scene-prop-select subtitlePosition">
+                                                        <option value="bottom" selected="@(scene.SubtitlePosition == "bottom")">Dưới đáy (Bottom)</option>
+                                                        <option value="top" selected="@(scene.SubtitlePosition == "top")">Trên đỉnh (Top)</option>
+                                                        <option value="center" selected="@(scene.SubtitlePosition == "center")">Chính giữa (Center)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </details>
+                                    </div>
+
+                                    <div class="scene-item__footer">
+                                        <button type="button" class="btn-scene-action btn-gen-audio" onclick="generateSceneAudio(@scene.Id, this)">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>
+                                            <span>Tạo Audio</span>
+                                        </button>
+                                        <button type="button" class="btn-scene-action btn-gen-image" onclick="generateSceneImage(@scene.Id, this)">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                            <span>Tạo Ảnh</span>
+                                        </button>
+                                        <button type="button" class="btn-scene-action btn-save-scene" onclick="saveSceneChanges(@scene.Id, this)">
+                                            <span>Lưu</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- PANE 2: DỰ ÁN & NGUỒN TÀI LIỆU -->
+                    <div id="paneAssets" class="studio-tab-pane studio-assets-pane hidden" role="tabpanel" aria-labelledby="tabNavAssets">
+                        <div class="studio-panel-actions">
+                            <span class="studio-panel-title">Nguồn tài liệu & Tệp đính kèm</span>
+                        </div>
+
+                        <!-- Dropzone Tài liệu học tập (Tier 17) -->
+                        <div class="file-dropzone" id="fileDropzone" role="button" tabindex="0" aria-label="Nạp tệp tài liệu học tập">
+                            <div class="dropzone-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <div class="dropzone-text">Kéo thả hoặc bấm để nạp tài liệu</div>
+                            <div class="dropzone-subtext">Hỗ trợ PDF, PPTX, DOCX, TXT, MD</div>
+                            <input type="file" id="sourceFileInput" class="file-input-hidden" accept=".pdf,.pptx,.docx,.txt,.md" />
+                            <div id="selectedFileInfo" class="selected-file-info hidden"></div>
+                        </div>
+
+                        <!-- Dropzone Ảnh Avatar Giảng viên (Tier 17) -->
+                        <div class="avatar-dropzone" id="avatarDropzone" role="button" tabindex="0" aria-label="Chọn ảnh chân dung Giảng viên AI">
+                            <div class="dropzone-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                            </div>
+                            <div class="dropzone-text">Ảnh chân dung Giảng viên AI</div>
+                            <div class="dropzone-subtext">Tùy chọn hiển thị avatar góc bài giảng</div>
+                            <input type="file" id="avatarFileInput" class="file-input-hidden" accept="image/*" multiple />
+                            <div id="selectedAvatarInfo" class="selected-file-info hidden"></div>
+                        </div>
+
+                        <div class="assets-quick-tools">
+                            <button type="button" class="btn-studio-action btn-studio-action--primary w-full" onclick="document.getElementById('btnOpenPlanModal').click()">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                <span>Mở Kế hoạch Auto-Video</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- PANE 3: TRỢ LÝ AI STUDIO (COPILOT DIALOGUE) -->
+                    <div id="paneCopilot" class="studio-tab-pane hidden" role="tabpanel" aria-labelledby="tabNavCopilot">
+                        <div id="studioChatPanel" class="studio-chat-panel">
+                            <div class="studio-chat-header">
+                                <span class="studio-chat-title">Trợ lý AI Studio</span>
+                                <span class="studio-chat-badge">HyperFrames Bridge</span>
+                            </div>
+
+                            <div class="studio-chat-quick-chips">
+                                <button type="button" class="studio-quick-chip" onclick="sendQuickCopilotCommand('Rút ngắn cảnh 1 còn 3s')">⚡ Rút ngắn cảnh 1</button>
+                                <button type="button" class="studio-quick-chip" onclick="sendQuickCopilotCommand('Đổi sang phong cách Noir Film')">🎬 Noir Film</button>
+                                <button type="button" class="studio-quick-chip" onclick="sendQuickCopilotCommand('Đổi giọng sang Lan Nhi')">🎙 Giọng Lan Nhi</button>
+                                <button type="button" class="studio-quick-chip" onclick="sendQuickCopilotCommand('Thêm một phân cảnh câu hỏi trắc nghiệm')">💡 Thêm Quiz</button>
+                            </div>
+
+                            <div id="studioChatMessages" class="studio-chat-messages">
+                                <div class="studio-chat-msg studio-chat-msg--assistant">
+                                    <div class="studio-chat-bubble">
+                                        Xin chào! Bạn có thể ra lệnh bằng tiếng Việt để tôi điều chỉnh kịch bản bài giảng, ví dụ: <em>"Đổi cảnh 2 sang đen trắng"</em>, <em>"Rút ngắn cảnh 1 còn 3s"</em>, <em>"Đổi giọng sang Lan Nhi"</em>.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <form id="studioChatForm" class="studio-chat-input-bar" onsubmit="handleStudioChatSubmit(event)">
+                                <input type="text" id="studioChatInput" class="studio-chat-input" placeholder="Nhập lệnh chỉnh sửa video..." autocomplete="off" />
+                                <button type="submit" id="btnStudioChatSend" class="studio-chat-send-btn">Gửi lệnh</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- KHU VỰC CHÍNH (SÂN KHẤU TRỰC TIẾP & TIMELINE ĐÁY) -->
+            <main class="studio-main-workspace" role="main">
+                <!-- SÂN KHẤU TRỰC TIẾP (16:9 / 9:16 LIVE MONITOR) -->
+                <section class="studio-stage-screen" aria-label="Màn hình xem trước phân cảnh">
+                    <div class="stage-header">
+                        <div class="stage-title-info">
+                            <span id="activeSceneIndicator" class="active-scene-pill">@(hasScenes ? $"Cảnh 1: {activeProject.Scenes[0].Title}" : "Chưa có phân cảnh")</span>
+                        </div>
+                        <div class="stage-aspect-ratio-controls">
+                            <button type="button" id="btnAspect169" class="btn-aspect active" title="Tỉ lệ chuẩn 16:9 (Ngang)">16:9</button>
+                            <button type="button" id="btnAspect916" class="btn-aspect" title="Tỉ lệ dọc 9:16 (Shorts/TikTok)">9:16</button>
+                        </div>
+                    </div>
+
+                    <!-- KHUNG CANVAS XEM TRƯỚC BÀI GIẢNG -->
+                    <div class="stage-canvas-wrapper aspect-16-9" id="stageCanvasWrapper">
+                        <div id="stageMediaPlaceholder" class="stage-media-placeholder">
+                            <canvas id="stageCyberCanvas" class="stage-cyber-canvas" width="640" height="360"></canvas>
+                            <img id="stageImagePreview" class="stage-image-preview hidden" src="" alt="Hình ảnh phân cảnh" />
+                            <div class="stage-overlay-watermark">
+                                <span class="stage-brand">COW.AI STUDIO · BÀI GIẢNG ĐIỆN TỬ</span>
+                                <span class="stage-indicator">AI MULTI-SCENE</span>
+                            </div>
+
+                            <div class="stage-caption-container" id="stageCaptionContainer">
+                                <h3 id="stageCaptionTitle" class="stage-caption-title">@(activeProject.Scenes.FirstOrDefault()?.Title ?? activeProject.Title)</h3>
+                                <p id="stageCaptionSubtitle" class="stage-caption-subtitle">@(activeProject.Scenes.FirstOrDefault()?.Content ?? "Chưa có kịch bản phân cảnh. Mở Kế hoạch Auto-Video hoặc bấm + Thêm cảnh để bắt đầu.")</p>
+                            </div>
+
+                            <!-- Thanh hiển thị trực quan âm thanh VieNeu -->
+                            <div id="stageAudioBars" class="stage-audio-visualizer hidden">
+                                <span class="audio-bar"></span><span class="audio-bar"></span><span class="audio-bar"></span>
+                                <span class="audio-bar"></span><span class="audio-bar"></span><span class="audio-bar"></span>
+                                <span class="audio-bar"></span><span class="audio-bar"></span><span class="audio-bar"></span>
+                            </div>
+                        </div>
+
+                        <!-- Trình phát Audio ngầm -->
+                        <audio id="studioAudioPlayer" preload="auto" class="hidden"></audio>
+                    </div>
+
+                    <!-- THANH ĐIỀU KHIỂN PHÁT SÂN KHẤU -->
+                    <div class="stage-controls-bar">
+                        <div class="stage-playback-buttons">
+                            <button type="button" id="btnPrevScene" class="btn-stage-control" title="Phân cảnh trước">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+                            </button>
+                            <button type="button" id="btnPlayPause" class="btn-stage-control btn-play-pause" title="Phát / Tạm dừng">
+                                <svg id="iconPlay" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                <svg id="iconPause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="hidden"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                            </button>
+                            <button type="button" id="btnNextScene" class="btn-stage-control" title="Phân cảnh tiếp theo">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                            </button>
+                        </div>
+
+                        <div class="stage-timecode">
+                            <span id="currentTimecode">00:00</span> / <span id="totalTimecode">@totalTimeText</span>
+                        </div>
+
+                        <div class="stage-timeline-scrubber">
+                            <input type="range" id="stageScrubber" min="0" max="100" value="0" class="stage-range-slider" />
+                        </div>
+
+                        <div class="stage-fullscreen-wrapper">
+                            <button type="button" id="btnFullscreenStage" class="btn-stage-control" title="Toàn màn hình sân khấu">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- KHUNG DÒNG THỜI GIAN ĐA RÃNH (Chỉ hiện khi dự án có ít nhất 1 phân cảnh) -->
+                <section id="studioTimelineDock" class="studio-timeline-dock @(hasScenes ? "" : "hidden")" aria-label="Bảng dòng thời gian đa phân cảnh">
+                    <div class="timeline-header">
+                        <div class="timeline-title-group">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                            <span class="timeline-title">Timeline Phân cảnh (Multi-Track)</span>
+                        </div>
+                        <div class="timeline-zoom-controls">
+                            <span class="timeline-duration-label">Tổng thời lượng: <strong id="timelineTotalDuration">@((int)Math.Round(totalSeconds))s</strong></span>
+                        </div>
+                    </div>
+
+                    <div class="timeline-ruler" id="timelineRuler">
+                        <span class="ruler-mark" style="left: 0%;">00:00</span>
+                        <span class="ruler-mark" style="left: 25%;">@TimeSpan.FromSeconds(totalSeconds * 0.25).ToString(@"mm\:ss")</span>
+                        <span class="ruler-mark" style="left: 50%;">@TimeSpan.FromSeconds(totalSeconds * 0.5).ToString(@"mm\:ss")</span>
+                        <span class="ruler-mark" style="left: 75%;">@TimeSpan.FromSeconds(totalSeconds * 0.75).ToString(@"mm\:ss")</span>
+                        <span class="ruler-mark" style="left: 100%;">@totalTimeText</span>
+                    </div>
+
+                    <div class="timeline-track-container" id="timelineTrackContainer">
+                        <div class="timeline-playhead" id="timelinePlayhead"></div>
+                        <div class="timeline-track" id="timelineTrack">
+                            @if (activeProject.Scenes.Count == 0)
+                            {
+                                <div class="timeline-empty-hint">
+                                    <span>Chưa có phân cảnh nào. Nhấp "+ Thêm cảnh" ở cột trái hoặc tạo kịch bản từ nút "Kế hoạch Auto-Video".</span>
+                                </div>
+                            }
+                            else
+                            {
+                                @for (int i = 0; i < activeProject.Scenes.Count; i++)
+                                {
+                                    var sc = activeProject.Scenes[i];
+                                    <div class="timeline-scene-block @(i == 0 ? "active" : "")" 
+                                         data-scene-id="@sc.Id" 
+                                         data-duration="@sc.DurationSeconds"
+                                         style="flex: @(sc.DurationSeconds > 0 ? sc.DurationSeconds : 5);"
+                                         onclick="selectSceneFromTimeline(@sc.Id)">
+                                        <span class="block-title">Cảnh @(sc.OrderIndex + 1)</span>
+                                        <span class="block-duration">@(sc.DurationSeconds.ToString("0.#"))s</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+
+    <!-- =========================================================================
+         4. MODAL KẾ HOẠCH AUTO-VIDEO (Tier 17) & CÁC MODAL BỔ TRỢ
+         ========================================================================= -->
+    <div id="studioPlanModal" class="studio-modal-backdrop hidden" aria-hidden="true" role="dialog" aria-labelledby="planModalTitle">
+        <div class="studio-modal studio-plan-modal-container">
+            <header class="studio-modal__header">
+                <div class="studio-modal__title-group">
+                    <h2 id="planModalTitle" class="studio-modal__title">Kế hoạch Sản xuất Video Bài giảng AI (Auto-Video)</h2>
+                    
+                </div>
+                <button type="button" id="btnClosePlanModal" class="studio-modal__close" aria-label="Đóng">✕</button>
+            </header>
+
+            <div class="studio-modal-tabs">
+                <button type="button" class="studio-modal-tab active" id="tabPlanIntake">Bước 1: Nạp tài liệu & Tùy chọn</button>
+                <button type="button" class="studio-modal-tab" id="tabPlanReview">Bước 2: Phê duyệt & Proceed</button>
+            </div>
+
+            <div class="studio-modal__body">
+                <!-- Tab 1: Intake & Options (Full-Screen 2-Column Workspace) -->
+                <div class="intake-pane" id="paneIntake">
+                    <!-- Cột trái: Nạp tài liệu, Ảnh giảng viên & Giọng đọc -->
+                    <div class="intake-pane-left">
+                        <div class="studio-setting-group">
+                            <label class="studio-setting-label">1. Nạp tài liệu bài giảng</label>
+                            <div class="file-dropzone plan-file-dropzone" id="planFileDropzone" role="button" tabindex="0" aria-label="Nạp tệp tài liệu bài giảng">
+                                <div class="dropzone-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                </div>
+                                <div class="dropzone-text" id="fileDropLabel">Kéo thả hoặc bấm để chọn tài liệu</div>
+                                <div class="dropzone-subtext">Hỗ trợ PDF, PPTX, DOCX, TXT, MD</div>
+                                <input type="file" id="planSourceFileInput" class="file-input-hidden" accept=".pdf,.pptx,.docx,.txt,.md" />
+                                <div id="planSelectedFileInfo" class="selected-file-info hidden"></div>
+                            </div>
+                        </div>
+
+                        <div class="studio-setting-group">
+                            <label class="studio-setting-label">2. Ảnh giảng viên AI (Tùy chọn, tối đa 3 ảnh)</label>
+                            <div class="avatar-dropzone plan-avatar-dropzone" id="planAvatarDropzone" role="button" tabindex="0" aria-label="Chọn ảnh giảng viên AI">
+                                <div class="dropzone-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
+                                </div>
+                                <div class="dropzone-text">Chọn ảnh chân dung Giảng viên</div>
+                                <div class="dropzone-subtext">PNG, JPG, WEBP · Hiển thị góc bài giảng</div>
+                                <input type="file" id="planAvatarFileInput" class="file-input-hidden" accept="image/*" multiple />
+                            </div>
+                            <div id="avatarPreviewStrip" class="avatar-preview-strip"></div>
+                        </div>
+
+                        <!-- Tùy chọn Giọng thuyết minh VieNeu -->
+                        <div class="studio-setting-group">
+                            <label for="planVoiceSelect" class="studio-setting-label">3. Giọng đọc thuyết minh VieNeu 48kHz</label>
+                            <select id="planVoiceSelect" class="studio-setting-select">
+                                <option value="Hải Đăng" selected="@(activeProject.Voice == "Hải Đăng")">Hải Đăng - Nam Miền Bắc (Chuẩn học thuật, truyền cảm)</option>
+                                <option value="Hoài My" selected="@(activeProject.Voice == "Hoài My")">Hoài My - Nữ Miền Bắc (Ấm áp, phát thanh viên)</option>
+                                <option value="Lan Nhi" selected="@(activeProject.Voice == "Lan Nhi")">Lan Nhi - Nữ Miền Nam (Tự nhiên, tươi sáng)</option>
+                                <option value="Nam Minh" selected="@(activeProject.Voice == "Nam Minh")">Nam Minh - Nam Miền Nam (Trầm ấm, lịch lãm)</option>
+                                <option value="Bình" selected="@(activeProject.Voice == "Bình")">Bình - Nam Miền Trung (Nội lực, khúc chiết)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Cột phải: Bố cục 3-Zone, Tùy chọn & Nội dung bài giảng -->
+                    <div class="intake-pane-right">
+                        <!-- Kiểu bố cục Video 3-Zone -->
+                        <div class="studio-setting-group">
+                            <label class="studio-setting-label">4. Kiểu trình bày bài giảng (3-Zone HyperFrames Layout)</label>
+                            <div class="composition-type-selector">
+                                <button type="button" class="btn-comp-type active" id="btnTypeComparison" data-type="comparison">
+                                    <span class="comp-icon">⚖</span>
+                                    <span class="comp-label">So sánh / Đối chiếu</span>
+                                    <span class="comp-desc">Hai cột trực quan với slide chính và luận điểm phụ</span>
+                                </button>
+                                <button type="button" class="btn-comp-type" id="btnTypeSequential" data-type="sequential">
+                                    <span class="comp-icon">➔</span>
+                                    <span class="comp-label">Tuần tự / Quy trình</span>
+                                    <span class="comp-desc">Các bước logic tuần tự theo dòng thời gian bài giảng</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tùy chọn nâng cao -->
+                        <div class="studio-setting-grid">
+                            <div class="studio-setting-item">
+                                <label class="studio-checkbox-label">
+                                    <input type="checkbox" id="checkHighlightKeywords" checked />
+                                    <span>Tự động gạch chân từ khóa chính (Highlight Tags)</span>
+                                </label>
+                            </div>
+                            <div class="studio-setting-item">
+                                <label class="studio-checkbox-label">
+                                    <input type="checkbox" id="checkGenerateImages" checked />
+                                    <span>Tự động sinh ảnh minh họa AI (SDXL Turbo)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Textarea nội dung bổ sung (Full flex height) -->
+                        <div class="studio-setting-group studio-setting-group--grow">
+                            <label for="inputSourceContent" class="studio-setting-label">5. Nội dung đề tài hoặc văn bản trích xuất từ tài liệu</label>
+                            <textarea id="inputSourceContent" class="studio-modal-textarea studio-modal-textarea--grow" placeholder="Nội dung tệp sẽ tự động hiển thị ở đây sau khi nạp ở cột trái, hoặc bạn có thể nhập trực tiếp dàn ý bài giảng..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Review, Edit & Proceed (Full-Screen Plan Workspace) -->
+                <div class="review-pane hidden" id="paneReview">
+                    <div class="review-pane__toolbar">
+                        <span class="review-pane__hint">Bản kế hoạch Markdown — xem dạng thẻ trực quan hoặc chuyển sang chỉnh sửa thô:</span>
+                        <button type="button" id="btnTogglePlanEditMode" class="btn-studio-action btn-studio-action--secondary">Chỉnh sửa kịch bản ✎</button>
+                    </div>
+
+                    <textarea id="planMarkdownEditor" class="plan-markdown-editor" spellcheck="false" style="display: none;"></textarea>
+
+                    <div class="plan-review-preview" id="planReviewCards"></div>
+                </div>
+            </div>
+
+            <footer class="studio-modal__footer">
+                <button type="button" id="btnCancelPlanModal" class="btn-studio-action btn-studio-action--secondary">Đóng</button>
+                <button type="button" id="btnBackToIntake" class="btn-studio-action btn-studio-action--secondary hidden">← Quay lại Bước 1</button>
+                <div class="studio-modal__footer-actions">
+                    <button type="button" id="btnGeneratePlan" class="btn-studio-action btn-studio-action--primary">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                        <span>Tạo Kế hoạch (Bắt đầu) ➔</span>
+                    </button>
+                    <button type="button" id="btnProceedPlan" class="btn-proceed hidden" disabled title="Phê duyệt kịch bản và bắt đầu sản xuất tự động">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <span>Proceed (Sản xuất Video) ▷</span>
+                    </button>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Modal Xem trước Composition HyperFrames -->
+    <div id="compositionPreviewModal" class="studio-modal-backdrop hidden" aria-hidden="true" role="dialog" aria-labelledby="compositionModalTitle">
+        <div class="studio-modal" style="max-width: 960px; width: 90vw;">
+            <header class="studio-modal__header">
+                <h2 id="compositionModalTitle" class="studio-modal__title">Xem trước Composition HyperFrames</h2>
+                <button type="button" id="btnClosePreviewModal" class="studio-modal__close" aria-label="Đóng">✕</button>
+            </header>
+            <div class="studio-modal__body" style="padding: 0; min-height: 480px;">
+                <iframe id="compositionIframe" style="width: 100%; height: 500px; border: none; border-radius: 6px;" title="HyperFrames Preview"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Tiến độ Xuất Video (Client MediaRecorder) -->
+    <div id="recordProgressOverlay" class="studio-modal-backdrop hidden" aria-hidden="true">
+        <div class="studio-modal" style="max-width: 400px; text-align: center;">
+            <h3 class="studio-modal__title" style="margin-bottom: 0.75rem;">Đang xuất Video...</h3>
+            <p id="recordProgressText" style="font-size: 0.85rem; color: var(--studio-text-muted); margin-bottom: 1rem;">Đang ghi các phân cảnh sang WebM/MP4...</p>
+            <div style="width: 100%; height: 6px; background: #262626; border-radius: 3px; overflow: hidden;">
+                <div id="recordProgressBarFill" style="width: 0%; height: 100%; background: #ffffff; transition: width 0.2s ease;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Gen Modal tương thích Probe Tier 15 -->
+    <div id="scriptGenModal" class="hidden" style="display:none;" aria-hidden="true"></div>
+</div>
+
+@section Scripts {
+    <script src="~/js/modules/studio-player.js" asp-append-version="true"></script>
+}

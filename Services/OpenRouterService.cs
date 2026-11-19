@@ -38,6 +38,22 @@ public class OpenRouterService
     }
 
     /// <summary>
+    /// Kiểm tra xem OpenRouter API Key đã được cấu hình hợp lệ hay chưa.
+    /// </summary>
+    public bool HasValidApiKey()
+    {
+        var apiKey = _config["OpenRouter:ApiKey"]
+            ?? _config["OPENROUTER_API_KEY"]
+            ?? Environment.GetEnvironmentVariable("OpenRouter__ApiKey")
+            ?? Environment.GetEnvironmentVariable("OPENROUTER_API_KEY");
+
+        return !string.IsNullOrWhiteSpace(apiKey)
+            && !apiKey.Contains("xxxxxxxx", StringComparison.OrdinalIgnoreCase)
+            && !apiKey.Contains("your_", StringComparison.OrdinalIgnoreCase)
+            && !apiKey.Contains("placeholder", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Gửi yêu cầu Chat và trả về luồng dữ liệu SSE (Server-Sent Events) từ OpenRouter API.
     /// Hỗ trợ truyền linh hoạt temperature và maxTokens.
     /// </summary>

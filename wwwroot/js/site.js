@@ -186,9 +186,90 @@
     });
   }
 
+  function initUserMenu() {
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userDropdown = document.getElementById('userDropdownMenu');
+
+    if (!userMenuBtn || !userDropdown) return;
+
+    userMenuBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const isOpen = userDropdown.classList.contains('active');
+      if (isOpen) {
+        userDropdown.classList.remove('active');
+        userDropdown.setAttribute('aria-hidden', 'true');
+        userMenuBtn.setAttribute('aria-expanded', 'false');
+      } else {
+        userDropdown.classList.add('active');
+        userDropdown.setAttribute('aria-hidden', 'false');
+        userMenuBtn.setAttribute('aria-expanded', 'true');
+
+        // Đóng theme dropdown nếu đang mở
+        const themeDropdown = document.getElementById('themeDropdownMenu');
+        if (themeDropdown) themeDropdown.classList.remove('active');
+      }
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!userDropdown.contains(e.target) && !userMenuBtn.contains(e.target)) {
+        userDropdown.classList.remove('active');
+        userDropdown.setAttribute('aria-hidden', 'true');
+        userMenuBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && userDropdown.classList.contains('active')) {
+        userDropdown.classList.remove('active');
+        userDropdown.setAttribute('aria-hidden', 'true');
+        userMenuBtn.setAttribute('aria-expanded', 'false');
+        userMenuBtn.focus();
+      }
+    });
+  }
+
+  function initToast() {
+    const toast = document.getElementById('appToast');
+    if (toast) {
+      setTimeout(function () {
+        if (toast && toast.parentNode) {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(-10px)';
+          toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+          setTimeout(function () {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+          }, 300);
+        }
+      }, 5000);
+    }
+  }
+
+  function initAmbientSpotlight() {
+    if (!document.body || document.body.classList.contains('studio-standalone-body')) return;
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let rafId = 0;
+    let lastX = 0;
+    let lastY = 0;
+    window.addEventListener('pointermove', function (e) {
+      lastX = e.clientX;
+      lastY = e.clientY;
+      if (rafId) return;
+      rafId = requestAnimationFrame(function () {
+        document.documentElement.style.setProperty('--cow-mx', lastX + 'px');
+        document.documentElement.style.setProperty('--cow-my', lastY + 'px');
+        rafId = 0;
+      });
+    }, { passive: true });
+  }
+
   function initApp() {
     initThemeSwitcher();
     initMobileNav();
+    initUserMenu();
+    initToast();
+    initAmbientSpotlight();
   }
 
   if (document.readyState === 'loading') {

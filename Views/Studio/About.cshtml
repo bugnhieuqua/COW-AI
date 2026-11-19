@@ -1,0 +1,160 @@
+@{
+    ViewData["Title"] = "COW.AI Studio - Nền tảng Biên tập & Sản xuất Video AI Đa Cảnh Tự Động";
+}
+
+<head>
+    <meta name="description" content="Khám phá COW.AI Studio: Nền tảng biên tập và sản xuất video AI đa cảnh tự động. Kết hợp kịch bản thông minh từ Ollama, giọng đọc biểu cảm Edge TTS và hình ảnh nghệ thuật SDXL Turbo trên GPU cục bộ." />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://cow.ai/studio/about" />
+    <meta property="og:title" content="COW.AI Studio - Nền tảng Biên tập & Sản xuất Video AI Đa Cảnh" />
+    <meta property="og:description" content="Tự động hóa toàn diện từ Kịch bản, Giọng nói đến Hình ảnh cảnh quay với bảo mật Client-side và sức mạnh GPU cục bộ." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cow.ai/studio/about" />
+
+    <!-- Schema.org Structured Data (JSON-LD) cho SEO Google -->
+    <script type="application/ld+json">
+    {
+      "@@context": "https://schema.org",
+      "@@type": "WebApplication",
+      "name": "COW.AI Studio",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "All modern browsers",
+      "description": "Nền tảng biên tập và sản xuất video AI đa cảnh tự động kết hợp kịch bản Ollama, giọng đọc Edge TTS và hình ảnh SDXL Turbo.",
+      "offers": {
+        "@@type": "Offer",
+        "price": "0",
+        "priceCurrency": "VND"
+      },
+      "featureList": [
+        "Biên kịch video tự động bằng mô hình AI cục bộ Ollama",
+        "Thuyết minh giọng đọc biểu cảm cao qua Edge TTS",
+        "Sinh hình ảnh cảnh quay độ phân giải cao bằng SDXL Turbo",
+        "Bảo mật quyền riêng tư 100% Client-side và SQLite cục bộ"
+      ]
+    }
+    </script>
+</head>
+
+<article class="studio-about-page" itemscope itemtype="https://schema.org/SoftwareApplication">
+    <!-- Hero Section -->
+    <header class="studio-about-hero">
+        <div class="studio-about-badge">
+            <span class="badge-dot"></span>
+            <span>COW.AI Studio 2.0 • Pro Max Multimedia</span>
+        </div>
+        <h1 class="studio-about-title" itemprop="name">Biên tập & Sản xuất Video AI Đa Cảnh Tự Động</h1>
+        <p class="studio-about-lead" itemprop="description">
+            Biến ý tưởng, bài giảng và tài liệu thành thước phim thuyết minh sống động chỉ trong vài giây. 
+            Tích hợp sức mạnh hiệp đồng của Kịch bản AI, Giọng đọc tự nhiên và Đồ họa GPU RTX 4060.
+        </p>
+        <div class="studio-about-cta-group">
+            <a href="/studio" class="btn-studio-cta-primary" title="Mở Studio Workspace ngay">
+                <span>Khởi chạy Studio Workspace</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+            </a>
+            <a href="#features" class="btn-studio-cta-secondary" title="Xem tính năng chi tiết">
+                <span>Tìm hiểu tính năng</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Bento Box Features Showcase -->
+    <section id="features" class="studio-bento-section" aria-labelledby="featuresHeading">
+        <div class="section-header-center">
+            <h2 id="featuresHeading" class="section-title">Quy trình Sản xuất 3-trong-1 Đột phá</h2>
+            <p class="section-subtitle">Tối ưu công thái học theo chuẩn UI UX Pro Max: Trực quan, chuẩn xác và không có thao tác thừa</p>
+        </div>
+
+        <div class="studio-bento-grid">
+            <!-- Bento Card 1: Script Gen -->
+            <div class="bento-card bento-card--large glass-panel">
+                <div class="bento-card__icon bento-card__icon--cyan">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+                <h3 class="bento-card__title">1. Phân cảnh & Biên kịch Thông minh</h3>
+                <p class="bento-card__desc">
+                    Mô hình ngôn ngữ lớn (Ollama Qwen 2.5 Coder / cow-ai:latest) phân tích đề bài, chia nhỏ thành các cảnh logic chặt chẽ, tối ưu lời thoại thuyết minh và tự sinh prompt mô tả hình ảnh chi tiết.
+                </p>
+                <div class="bento-card__preview bento-card__preview--code">
+                    <div class="code-preview-header">
+                        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                        <span class="code-preview-label">kịch_bản_ai.json</span>
+                    </div>
+                    <pre class="code-preview-body"><code>{
+  "orderIndex": 1,
+  "title": "Mở đầu ấn tượng",
+  "content": "Chào mừng bạn đến với kỷ nguyên trí tuệ nhân tạo...",
+  "durationSeconds": 5.2
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- Bento Card 2: Voiceover TTS -->
+            <div class="bento-card glass-panel">
+                <div class="bento-card__icon bento-card__icon--emerald">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                </div>
+                <h3 class="bento-card__title">2. Giọng đọc Edge TTS Biểu cảm</h3>
+                <p class="bento-card__desc">
+                    Hỗ trợ các giọng thuyết minh tiếng Việt chuẩn xác (Hoài My, Nam Minh), tự động đồng bộ thời lượng từng cảnh và phát âm mượt mà không độ trễ.
+                </p>
+            </div>
+
+            <!-- Bento Card 3: SDXL Turbo -->
+            <div class="bento-card glass-panel">
+                <div class="bento-card__icon bento-card__icon--purple">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                </div>
+                <h3 class="bento-card__title">3. Đồ họa AI SDXL Turbo Siêu tốc</h3>
+                <p class="bento-card__desc">
+                    Sinh hình ảnh chất lượng cao 768x432 chỉ trong ~5 giây trên GPU RTX 4060. Tự động giải phóng VRAM thông minh và dự phòng Pollinations AI.
+                </p>
+            </div>
+
+            <!-- Bento Card 4: Timeline & Player -->
+            <div class="bento-card bento-card--wide glass-panel">
+                <div class="bento-card__icon bento-card__icon--amber">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                    </svg>
+                </div>
+                <h3 class="bento-card__title">4. Stage Preview Trực quan & Timeline Đồng bộ</h3>
+                <p class="bento-card__desc">
+                    Xem trước video tương tác với hiệu ứng chuyển cảnh mềm mại, phụ đề chữ chạy động, thanh seekbar đa rãnh và khả năng biên tập nội dung theo thời gian thực mà không cần cài đặt phần mềm dựng phim phức tạp.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bottom CTA -->
+    <footer class="studio-about-footer glass-panel">
+        <div class="studio-about-footer__content">
+            <h2 class="footer-cta-title">Sẵn sàng trải nghiệm Studio chuẩn Pro Max?</h2>
+            <p class="footer-cta-desc">Hoàn toàn miễn phí, 100% dữ liệu lưu trữ cục bộ bảo mật trên máy tính của bạn.</p>
+        </div>
+        <a href="/studio" class="btn-studio-cta-primary">
+            <span>Bắt đầu dựng dự án ngay</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+        </a>
+    </footer>
+</article>

@@ -1,0 +1,58 @@
+@model COW_AI.Models.ViewModels.ProfileViewModel
+@{
+    ViewData["Title"] = "Hồ sơ cá nhân";
+}
+
+<section class="auth-page-container profile-container" aria-labelledby="profileHeading">
+    <div class="auth-card profile-card glass-panel">
+        <header class="auth-card__header">
+            <div class="profile-avatar-large">
+                <span class="profile-avatar-text">@(string.IsNullOrEmpty(Model.FullName) ? Model.Username[0].ToString().ToUpper() : Model.FullName[0].ToString().ToUpper())</span>
+            </div>
+            <h1 id="profileHeading" class="auth-card__title">@Model.FullName</h1>
+            <div class="profile-role-badge @(Model.Role == "Admin" ? "role-admin" : "role-member")">
+                <span>@(Model.Role == "Admin" ? "Quản trị viên (Admin)" : "Thành viên (Member)")</span>
+            </div>
+        </header>
+
+        <div class="profile-details-grid">
+            <div class="profile-field">
+                <span class="profile-field__label">Tên đăng nhập</span>
+                <span class="profile-field__value font-mono">@@@Model.Username</span>
+            </div>
+            <div class="profile-field">
+                <span class="profile-field__label">Địa chỉ Email</span>
+                <span class="profile-field__value">@Model.Email</span>
+            </div>
+            <div class="profile-field">
+                <span class="profile-field__label">Ngày khởi tạo tài khoản</span>
+                <span class="profile-field__value">@Model.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+            </div>
+            <div class="profile-field">
+                <span class="profile-field__label">Lần đăng nhập gần nhất</span>
+                <span class="profile-field__value">@(Model.LastLoginAt.HasValue ? Model.LastLoginAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "Chưa ghi nhận")</span>
+            </div>
+        </div>
+
+        <div class="profile-actions">
+            <a asp-controller="Home" asp-action="Index" class="btn-auth-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                <span>Về trang chủ</span>
+            </a>
+            <form asp-controller="Account" asp-action="Logout" method="post" class="logout-form-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn-logout-danger">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <span>Đăng xuất</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</section>

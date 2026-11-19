@@ -83,6 +83,41 @@ const testSuites = [
         tier: 'Tier 11',
         title: 'Ollama Cloud & Free Models Integration Verification',
         file: path.join(__dirname, 'tier11-ollama-cloud-integration.test.mjs')
+    },
+    {
+        tier: 'Tier 12',
+        title: 'Local SDXL Turbo Image Service Integration',
+        file: path.join(__dirname, 'tier12-local-image-integration.test.mjs')
+    },
+    {
+        tier: 'Tier 13',
+        title: 'Slash Skills System (/imags, /code, /image, /search, /tts)',
+        file: path.join(__dirname, 'tier13-slash-skills-integration.test.mjs')
+    },
+    {
+        tier: 'Tier 14',
+        title: 'Cookie Auth & SQLite User System (Plan/NangCap.md)',
+        file: path.join(__dirname, 'tier14-account-auth.test.mjs')
+    },
+    {
+        tier: 'Tier 15',
+        title: 'Studio Dashboard & SEO Multimedia Pro Max (Plan/Studio.md)',
+        file: path.join(__dirname, 'tier15-studio-dashboard.test.mjs')
+    },
+    {
+        tier: 'Tier 16',
+        title: 'Studio Advanced, Scene Property Panel & Video Export',
+        file: path.join(__dirname, 'tier16-studio-advanced.test.mjs')
+    },
+    {
+        tier: 'Tier 17',
+        title: 'VieNeu-TTS, Auto-Video Pipeline & Markdown Plan Approval Gate',
+        file: path.join(__dirname, 'tier17-vieneu-autovideo-plan.test.mjs')
+    },
+    {
+        tier: 'Tier 18',
+        title: 'PostgreSQL Dual-Mode, Studio Conversational AI & HyperFrames Composition',
+        file: path.join(__dirname, 'tier18-postgres-studio-chat.test.mjs')
     }
 ];
 

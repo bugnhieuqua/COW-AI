@@ -1,2 +1,18 @@
-# Chỉ bỏ qua file chứa API key cá nhân
+# Secrets & Local Environment
 Key.env
+.env
+
+# Build outputs, Python cache & Local Databases
+bin/
+obj/
+**/__pycache__/
+*.pyc
+Data/*.db
+Data/*.db-shm
+Data/*.db-wal
+
+# Generated Studio Render Outputs
+wwwroot/media/studio/renders/
+wwwroot/media/studio/avatars/
+wwwroot/media/studio/audio/
+wwwroot/media/studio/images/

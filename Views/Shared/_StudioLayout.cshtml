@@ -1,0 +1,194 @@
+@using System.Security.Claims
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>@(ViewData["Title"] ?? "COW.AI Studio") - Trình biên tập Video Bài giảng AI</title>
+    @await RenderSectionAsync("Head", required: false)
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" type="image/png" href="~/images/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/pages.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/prism/prism-tomorrow.min.css" asp-append-version="true" />
+
+    <script>
+        (function () {
+            var theme = localStorage.getItem('cowai_theme') || 'dark';
+            var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            var root = document.documentElement;
+            if (isDark) {
+                root.classList.add('dark');
+                root.classList.remove('light');
+            } else {
+                root.classList.add('light');
+                root.classList.remove('dark');
+            }
+        })();
+    </script>
+    <style>
+        /* CapCut Studio Clean Environment - Strict Flat Monochrome (Zero Dynamic Background / No Three.js) */
+        html, body {
+            height: 100vh;
+            height: 100dvh;
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: var(--studio-bg, #000000);
+            color: var(--studio-text, #ffffff);
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        #three-canvas {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+        @@media (max-width: 1024px) {
+            html, body {
+                height: auto;
+                min-height: 100dvh;
+                width: 100%;
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+        }
+    </style>
+</head>
+<body class="studio-standalone-body"
+      data-tts-voice="vi-VN-HoaiMyNeural" 
+      data-user-id="@(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "guest")" 
+      data-user-name="@(User.Identity?.Name ?? "Khách")" 
+      data-user-role="@(User.FindFirst(ClaimTypes.Role)?.Value ?? "Guest")">
+
+    <div class="studio-shell">
+        @RenderBody()
+    </div>
+
+    <!-- Scripts cần thiết cho Studio -->
+    <script src="~/lib/prism/prism.min.js" asp-append-version="true"></script>
+    <script src="~/lib/prism/prism-csharp.min.js" asp-append-version="true"></script>
+    
+    <!-- Theme Switcher Logic cho Studio -->
+    <script>
+        (function () {
+            const MOON_PATH = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+            const SUN_PATH = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+
+            function syncStudioThemeIcons(isDark) {
+                document.querySelectorAll('#studioThemeToggleBtn .icon-theme, #btnHubThemeToggle .icon-theme').forEach(function (svg) {
+                    svg.innerHTML = isDark ? MOON_PATH : SUN_PATH;
+                });
+            }
+
+            function toggleStudioTheme() {
+                const isDark = document.documentElement.classList.contains('dark');
+                const nextIsDark = !isDark;
+                localStorage.setItem('cowai_theme', nextIsDark ? 'dark' : 'light');
+                document.documentElement.classList.toggle('dark', nextIsDark);
+                document.documentElement.classList.toggle('light', !nextIsDark);
+                document.body.classList.toggle('dark', nextIsDark);
+                document.body.classList.toggle('light', !nextIsDark);
+                syncStudioThemeIcons(nextIsDark);
+            }
+
+            syncStudioThemeIcons(document.documentElement.classList.contains('dark'));
+            const themeBtn = document.getElementById('studioThemeToggleBtn');
+            if (themeBtn) themeBtn.addEventListener('click', toggleStudioTheme);
+            const hubThemeBtn = document.getElementById('btnHubThemeToggle');
+            if (hubThemeBtn) hubThemeBtn.addEventListener('click', toggleStudioTheme);
+
+            // Dropdown Menu Studio (Góc trái)
+            const btnStudioMenu = document.getElementById('btnStudioMainMenu');
+            const menuDropdown = document.getElementById('studioMainDropdown');
+            if (btnStudioMenu && menuDropdown) {
+                btnStudioMenu.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    menuDropdown.classList.toggle('active');
+                });
+                document.addEventListener('click', function (e) {
+                    if (!menuDropdown.contains(e.target) && e.target !== btnStudioMenu) {
+                        menuDropdown.classList.remove('active');
+                    }
+                });
+            }
+
+            // Dropdown Xuất Video Studio (Gom Render MP4 / Composition / Xuất Client)
+            const btnExportMenu = document.getElementById('btnStudioExportMenu');
+            const exportDropdown = document.getElementById('studioExportDropdown');
+            if (btnExportMenu && exportDropdown) {
+                btnExportMenu.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const isOpen = exportDropdown.classList.toggle('active');
+                    btnExportMenu.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                });
+                document.addEventListener('click', function (e) {
+                    if (!exportDropdown.contains(e.target) && !btnExportMenu.contains(e.target)) {
+                        exportDropdown.classList.remove('active');
+                        btnExportMenu.setAttribute('aria-expanded', 'false');
+                    }
+                });
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape') {
+                        exportDropdown.classList.remove('active');
+                        btnExportMenu.setAttribute('aria-expanded', 'false');
+                    }
+                });
+            }
+
+            // Dropdown Account Studio (Góc phải)
+            const btnAccountMenu = document.getElementById('btnStudioAccountMenu');
+            const accountDropdown = document.getElementById('studioAccountDropdown');
+            if (btnAccountMenu && accountDropdown) {
+                btnAccountMenu.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    accountDropdown.classList.toggle('active');
+                });
+                document.addEventListener('click', function (e) {
+                    if (!accountDropdown.contains(e.target) && e.target !== btnAccountMenu) {
+                        accountDropdown.classList.remove('active');
+                    }
+                });
+            }
+
+            // Adaptive Slide-out Drawer cho Studio Hub (<= 1024px)
+            const btnHubMenu = document.getElementById('btnHubMobileSidebarToggle');
+            const hubSidebar = document.getElementById('studioHubSidebar');
+            const hubBackdrop = document.getElementById('hubSidebarBackdrop');
+            function setHubDrawer(open) {
+                if (!hubSidebar || !btnHubMenu) return;
+                hubSidebar.classList.toggle('is-open', open);
+                if (hubBackdrop) hubBackdrop.classList.toggle('active', open);
+                btnHubMenu.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+            if (btnHubMenu && hubSidebar) {
+                btnHubMenu.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    setHubDrawer(!hubSidebar.classList.contains('is-open'));
+                });
+                if (hubBackdrop) {
+                    hubBackdrop.addEventListener('click', function () { setHubDrawer(false); });
+                }
+                hubSidebar.querySelectorAll('.studio-hub-nav__item').forEach(function (item) {
+                    item.addEventListener('click', function () {
+                        if (window.innerWidth <= 1024) setHubDrawer(false);
+                    });
+                });
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape' && hubSidebar.classList.contains('is-open')) {
+                        setHubDrawer(false);
+                        btnHubMenu.focus();
+                    }
+                });
+            }
+        })();
+    </script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -10,6 +10,7 @@ public class HomeController : Controller
     private readonly OpenRouterService _openRouter;
     private readonly OllamaService _ollama;
     private readonly PollinationsService _pollinations;
+    private readonly LocalImageService _localImage;
     private readonly PromptService _promptService;
     private readonly ITtsService _ttsService;
     private readonly DuckDuckGoService _duckDuckGo;
@@ -25,6 +26,7 @@ public class HomeController : Controller
         OpenRouterService openRouter, 
         OllamaService ollama,
         PollinationsService pollinations, 
+        LocalImageService localImage,
         PromptService promptService,
         ITtsService ttsService,
         DuckDuckGoService duckDuckGo,
@@ -34,6 +36,7 @@ public class HomeController : Controller
         _openRouter = openRouter;
         _ollama = ollama;
         _pollinations = pollinations;
+        _localImage = localImage;
         _promptService = promptService;
         _ttsService = ttsService;
         _duckDuckGo = duckDuckGo;
@@ -42,6 +45,12 @@ public class HomeController : Controller
     }
 
     public IActionResult Index() => View();
+
+    [HttpGet("/api/skills")]
+    public IActionResult GetSkills()
+    {
+        return Content(_promptService.GetSkillsJson(), "application/json; charset=utf-8");
+    }
 
     [AcceptVerbs("GET", "POST")]
     public async Task<IActionResult> StreamChat(
@@ -96,7 +105,59 @@ public class HomeController : Controller
         Response.Headers["Connection"] = "keep-alive";
         Response.Headers["X-Accel-Buffering"] = "no";
 
-        // 2. Nhánh Tạo ảnh: Điều phối qua IntentDispatcherService
+        // 2a. Nhánh Tạo ảnh Local GPU (/imags hoặc model=local-image -> stable-diffusion.cpp SDXL Turbo)
+        if (_intentDispatcher.DetectLocalImageIntent(prompt, model, out var localCleanPrompt))
+        {
+            try
+            {
+                var (width, height) = IntentDispatcherService.ExtractDimensions(localCleanPrompt, out var finalPrompt);
+                var enhancedPrompt = await _promptService.GetImageGenerationPromptAsync(finalPrompt, cancellationToken);
+                var (imageUrl, actualWidth, actualHeight) = await _localImage.GenerateImageAsync(enhancedPrompt, width, height, cancellationToken);
+
+                var payload = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    is_image_url = imageUrl,
+                    prompt = localCleanPrompt,
+                    enhanced_prompt = enhancedPrompt,
+                    provider = "local-sdxl-turbo",
+                    width = actualWidth,
+                    height = actualHeight,
+                    choices = new[]
+                    {
+                        new
+                        {
+                            delta = new
+                            {
+                                content = $"![image]({imageUrl})\n\n"
+                            }
+                        }
+                    }
+                }, _jsonOptions);
+
+                await Response.WriteAsync($"data: {payload}\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
+                await Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Client hủy kết nối
+            }
+            catch (InvalidOperationException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogWarning(ex, "Cảnh báo tạo ảnh Local GPU cho prompt: {Prompt}", localCleanPrompt);
+                await SendSafeSseErrorAsync(ex.Message, cancellationToken);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogError(ex, "Lỗi khi tạo ảnh Local GPU cho prompt: {Prompt}", localCleanPrompt);
+                await SendSafeSseErrorAsync("Không thể tạo ảnh trên GPU Local vào lúc này. Vui lòng thử lại sau ít phút.", cancellationToken);
+            }
+
+            return new EmptyResult();
+        }
+
+        // 2b. Nhánh Tạo ảnh Cloud: Điều phối qua IntentDispatcherService (Pollinations AI)
         if (_intentDispatcher.DetectImageIntent(prompt, model, out var cleanPrompt))
         {
             try
@@ -139,12 +200,95 @@ public class HomeController : Controller
             return new EmptyResult();
         }
 
-        // 3. Nhánh DuckDuckGo Search: Điều phối qua DuckDuckGoService
-        if (normalizedModel == "duckduckgo")
+        // 2.5. Nhánh Kỹ năng Lập trình chuyên sâu (/code -> bọc template Prompts/CodeGeneration.txt + định tuyến model lập trình)
+        if (_intentDispatcher.DetectCodeSkillIntent(prompt, out var cleanCodePrompt))
+        {
+            var wrappedCodePrompt = _promptService.GetCodeGenPrompt(
+                cleanCodePrompt,
+                "phù hợp với yêu cầu",
+                "Mã nguồn sạch, tối ưu hiệu năng, đặt trong khối code Markdown có khai báo ngôn ngữ và giải thích ngắn gọn phía sau.");
+
+            bool codeDoneSent = false;
+            try
+            {
+                Stream stream;
+                if (OllamaService.IsOllamaModel(normalizedModel))
+                {
+                    stream = await _ollama.StreamChatAsync(wrappedCodePrompt, normalizedModel, temperature, maxTokens, cancellationToken);
+                }
+                else if (_openRouter.HasValidApiKey())
+                {
+                    stream = await _openRouter.StreamChatAsync(wrappedCodePrompt, "deepseek", temperature, maxTokens, cancellationToken);
+                }
+                else
+                {
+                    _logger?.LogInformation("Skill /code định tuyến sang Ollama Local (cow-ai-local) cho prompt.");
+                    stream = await _ollama.StreamChatAsync(wrappedCodePrompt, "cow-ai-local", temperature, maxTokens, cancellationToken);
+                }
+
+                using var reader = new StreamReader(stream);
+                string? line;
+                while (!cancellationToken.IsCancellationRequested && (line = await reader.ReadLineAsync(cancellationToken)) != null)
+                {
+                    if (line.StartsWith("data: "))
+                    {
+                        var data = line.Substring(6).Trim();
+                        if (data == "[DONE]")
+                        {
+                            await Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
+                            codeDoneSent = true;
+                            break;
+                        }
+                        if (!string.IsNullOrEmpty(data))
+                        {
+                            await Response.WriteAsync($"data: {data}\n\n", cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
+                        }
+                    }
+                    else if (line.StartsWith("data:"))
+                    {
+                        var data = line.Substring(5).Trim();
+                        if (data == "[DONE]")
+                        {
+                            await Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
+                            codeDoneSent = true;
+                            break;
+                        }
+                        if (!string.IsNullOrEmpty(data))
+                        {
+                            await Response.WriteAsync($"data: {data}\n\n", cancellationToken);
+                            await Response.Body.FlushAsync(cancellationToken);
+                        }
+                    }
+                }
+
+                if (!codeDoneSent && !cancellationToken.IsCancellationRequested)
+                {
+                    await Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+                    await Response.Body.FlushAsync(cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Client ngắt kết nối
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogError(ex, "Lỗi khi xử lý skill /code cho prompt: {Prompt}", cleanCodePrompt);
+                await SendSafeSseErrorAsync("Hệ thống AI hiện đang bận. Vui lòng thử lại sau ít phút.", cancellationToken);
+            }
+
+            return new EmptyResult();
+        }
+
+        // 3. Nhánh DuckDuckGo Search: Điều phối qua DuckDuckGoService (model=duckduckgo hoặc /search)
+        if (_intentDispatcher.DetectSearchSkillIntent(prompt, model, out var searchQuery))
         {
             try
             {
-                var searchResults = await _duckDuckGo.SearchAsync(prompt, cancellationToken);
+                var searchResults = await _duckDuckGo.SearchAsync(searchQuery, cancellationToken);
                 var searchPayload = System.Text.Json.JsonSerializer.Serialize(new
                 {
                     choices = new[]
@@ -262,7 +406,16 @@ public class HomeController : Controller
         bool doneSent = false;
         try
         {
-            var stream = await _openRouter.StreamChatAsync(prompt, modelToUse, temperature, maxTokens, cancellationToken);
+            Stream stream;
+            if (_openRouter.HasValidApiKey())
+            {
+                stream = await _openRouter.StreamChatAsync(prompt, modelToUse, temperature, maxTokens, cancellationToken);
+            }
+            else
+            {
+                _logger?.LogInformation("OpenRouter:ApiKey chưa cấu hình — tự động chuyển sang Ollama Local (cow-ai-local) cho prompt.");
+                stream = await _ollama.StreamChatAsync(prompt, "cow-ai-local", temperature, maxTokens, cancellationToken);
+            }
 
             using var reader = new StreamReader(stream);
             string? line;
@@ -386,6 +539,31 @@ public class HomeController : Controller
     // - DuckDuckGo sanitizer: singleLineQuery = cleanQuery.Replace("\r", " ").Replace("\n", " ").Trim();
     // - DuckDuckGo effectiveHeading = string.IsNullOrWhiteSpace(heading) ? singleLineQuery : heading;
     // - DuckDuckGo markdown url escape: url.Replace(")", "%29");
+
+    [HttpGet("/sitemap.xml")]
+    [ResponseCache(Duration = 3600)]
+    public IActionResult Sitemap()
+    {
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var lastMod = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var urls = new (string Path, string Priority)[]
+        {
+            ("/", "1.0"),
+            ("/Image", "0.9"),
+            ("/Document/Summary", "0.9"),
+            ("/Document/CodeGen", "0.9"),
+            ("/studio/about", "0.8")
+        };
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+        sb.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
+        foreach (var (p, prio) in urls)
+        {
+            sb.AppendLine($"  <url><loc>{baseUrl}{p}</loc><lastmod>{lastMod}</lastmod><changefreq>weekly</changefreq><priority>{prio}</priority></url>");
+        }
+        sb.AppendLine("</urlset>");
+        return Content(sb.ToString(), "application/xml", System.Text.Encoding.UTF8);
+    }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()

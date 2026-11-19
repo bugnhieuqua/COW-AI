@@ -5,8 +5,24 @@
 (function (global) {
   'use strict';
 
-  const STORAGE_KEY_SESSIONS = 'cowai_chat_sessions';
-  const STORAGE_KEY_ACTIVE_ID = 'cowai_active_session_id';
+  function getUserId() {
+    try {
+      if (typeof document !== 'undefined' && document.body && document.body.dataset && document.body.dataset.userId) {
+        return document.body.dataset.userId;
+      }
+    } catch { }
+    return 'guest';
+  }
+
+  function getSessionsKey() {
+    const uid = getUserId();
+    return uid && uid !== 'guest' ? 'cowai_chat_sessions_u' + uid : 'cowai_chat_sessions';
+  }
+
+  function getActiveIdKey() {
+    const uid = getUserId();
+    return uid && uid !== 'guest' ? 'cowai_active_session_id_u' + uid : 'cowai_active_session_id';
+  }
 
   function generateId() {
     return 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
@@ -14,7 +30,7 @@
 
   function getSessions() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY_SESSIONS);
+      const raw = localStorage.getItem(getSessionsKey());
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed : [];
@@ -26,7 +42,7 @@
 
   function saveSessions(sessions) {
     try {
-      localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
+      localStorage.setItem(getSessionsKey(), JSON.stringify(sessions));
     } catch (e) {
       console.warn('[ChatHistoryStore] Lỗi lưu sessions vào localStorage:', e);
     }
@@ -34,7 +50,7 @@
 
   function getActiveSessionId() {
     try {
-      return localStorage.getItem(STORAGE_KEY_ACTIVE_ID) || null;
+      return localStorage.getItem(getActiveIdKey()) || null;
     } catch {
       return null;
     }
@@ -43,9 +59,9 @@
   function setActiveSessionId(id) {
     try {
       if (id) {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_ID, id);
+        localStorage.setItem(getActiveIdKey(), id);
       } else {
-        localStorage.removeItem(STORAGE_KEY_ACTIVE_ID);
+        localStorage.removeItem(getActiveIdKey());
       }
     } catch (e) {
       console.warn('[ChatHistoryStore] Lỗi cập nhật active session ID:', e);

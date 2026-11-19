@@ -1,75 +1,263 @@
 /* ==========================================================================
-   COW.AI - Global Site CSS
+   COW.AI - Global Design System & Site Core (UI/UX Pro Max Engine)
+   Standard: 60-30-10 Color Architecture, Modular Spacing & Zero AI-Slop
    ========================================================================== */
 
 :root {
-  --cow-accent: #0EA5E9;
-  --cow-gradient-start: #0EA5E9;
-  --cow-gradient-end: #6366F1;
+  /* Obsidian & Cobalt Design System (60-30-10, WCAG 2.2 AA, Zero AI-Slop) */
+  --cow-bg: #09090b;
+  --cow-bg-secondary: #121316;
+  --cow-surface-card: #141519;
+  --cow-surface-elevated: #1b1c22;
+  --cow-border: #27272a;
+  --cow-border-strong: #3f3f46;
+  --cow-text: #f4f4f5;
+  --cow-text-muted: #a1a1aa;
+  --cow-accent: #38bdf8;
+  --cow-accent-hover: #7dd3fc;
+  --cow-accent-soft: rgba(56, 189, 248, 0.12);
+  --cow-accent-green: #22c55e;
+  --cow-cta-bg: #f4f4f5;
+  --cow-cta-hover: #e4e4e7;
+  --cow-cta-text: #09090b;
+  --cow-badge-bg: #18181b;
+  --cow-badge-text: #e4e4e7;
+  --cow-badge-border: #27272a;
+  --cow-vignette-center: #0e1118;
+  --cow-silk-primary: rgba(56, 189, 248, 0.11);
+  --cow-silk-secondary: rgba(99, 102, 241, 0.06);
+  --cow-silk-ambient: rgba(14, 165, 233, 0.045);
+  --cow-cursor-glow: rgba(56, 189, 248, 0.065);
+  --cow-card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --cow-grain-opacity: 0.022;
 
-  /* Hệ thống khoảng cách chuẩn (Spacing System - Mục 5.1 ChuanSeo.md) */
+  --cow-glass-bg: rgba(18, 19, 22, 0.88);
+  --cow-glass-hover: rgba(255, 255, 255, 0.06);
+  --cow-glass-border: rgba(255, 255, 255, 0.08);
+  --cow-input-bg: #141519;
+  --cow-msg-user-bg: #1e293b;
+  --cow-msg-ai-bg: #141519;
+
+  --code-editor-bg: #0f1014;
+  --code-editor-header: #16171d;
+  --code-editor-border: #27272a;
+  --code-editor-text: #f4f4f5;
+
+  /* Modular Spacing Scale (8-Point Rhythm) */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 16px;
   --space-4: 24px;
   --space-5: 32px;
+  --space-6: 48px;
 
-  /* Theme tokens - Sáng (Trắng ra sáng, hoàn toàn không pha xanh) */
-  --cow-bg: #ffffff;
-  --cow-bg-secondary: #f8fafc;
-  --cow-border: #e2e8f0;
-  --cow-text: #0f172a;
-  --cow-text-muted: #64748b;
-  --cow-glass-bg: #ffffff;
-  --cow-glass-border: #e2e8f0;
-  --cow-input-bg: #f8fafc;
-  --cow-msg-user-bg: rgba(14, 165, 233, 0.1);
-  --cow-msg-ai-bg: #f8fafc;
+  /* Standard Border Radii (Craft Floor: 4px to 16px) */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Typography Stacks (Plus Jakarta Sans Vietnamese + JetBrains Mono Code) */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Responsive Micro-Interaction Timings (150-250ms) */
+  --transition-fast: 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-base: 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-slow: 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Light Mode Overrides (Clean Paper Surface - High Contrast WCAG 2.2 AA) */
+html.light,
+body.light,
+html.light body,
+:root.light {
+  --cow-bg: #f8fafc;
+  --cow-bg-secondary: #f1f5f9;
+  --cow-surface-card: #ffffff;
+  --cow-surface-elevated: #f8fafc;
+  --cow-border: #e4e4e7;
+  --cow-border-strong: #cbd5e1;
+  --cow-text: #09090b;
+  --cow-text-muted: #52525b;
+  --cow-accent: #0284c7;
+  --cow-accent-hover: #0369a1;
+  --cow-accent-soft: rgba(2, 132, 199, 0.1);
+  --cow-accent-green: #16a34a;
+  --cow-cta-bg: #09090b;
+  --cow-cta-hover: #27272a;
+  --cow-cta-text: #ffffff;
+  --cow-badge-bg: #f1f5f9;
+  --cow-badge-text: #1e293b;
+  --cow-badge-border: #cbd5e1;
+  --cow-vignette-center: #ffffff;
+  --cow-silk-primary: rgba(14, 165, 233, 0.095);
+  --cow-silk-secondary: rgba(59, 130, 246, 0.055);
+  --cow-silk-ambient: rgba(186, 230, 253, 0.24);
+  --cow-cursor-glow: rgba(2, 132, 199, 0.055);
+  --cow-card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 4px 16px rgba(15, 23, 42, 0.06);
+  --cow-grain-opacity: 0.016;
+
+  --cow-glass-bg: rgba(255, 255, 255, 0.92);
+  --cow-glass-hover: rgba(9, 9, 11, 0.05);
+  --cow-glass-border: #e4e4e7;
+  --cow-input-bg: #ffffff;
+  --cow-msg-user-bg: #0f172a;
+  --cow-msg-ai-bg: #ffffff;
+
   --code-editor-bg: #f8fafc;
   --code-editor-header: #f1f5f9;
   --code-editor-border: #e2e8f0;
-  --code-editor-text: #1e293b;
+  --code-editor-text: #0f172a;
 }
 
-/* Theme tokens - Tối (OLED Dark Slate chuẩn Kỹ thuật - ui-ux-pro-max) */
-body.dark, html.dark, html.dark body, :root.dark {
-  --cow-bg: #0f172a;
-  --cow-bg-secondary: #1b2336;
-  --cow-border: #334155;
-  --cow-text: #f8fafc;
-  --cow-text-muted: #94a3b8;
-  --cow-glass-bg: rgba(15, 23, 42, 0.85);
-  --cow-glass-border: rgba(255, 255, 255, 0.08);
-  --cow-input-bg: rgba(27, 35, 54, 0.85);
-  --cow-msg-user-bg: rgba(56, 189, 248, 0.12);
-  --cow-msg-ai-bg: rgba(27, 35, 54, 0.6);
-  --code-editor-bg: #111a33;
-  --code-editor-header: #0d152a;
-  --code-editor-border: #334155;
-  --code-editor-text: #f8fafc;
+/* Base Reset & Box Sizing */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-/* Theme tokens - Sáng (Trắng ra sáng) */
-body.light, html.light, html.light body, :root.light {
-  --cow-bg: #ffffff;
-  --cow-bg-secondary: #f8fafc;
-  --cow-border: #e2e8f0;
-  --cow-text: #0f172a;
-  --cow-text-muted: #64748b;
-  --cow-glass-bg: #ffffff;
-  --cow-glass-border: #e2e8f0;
-  --cow-input-bg: #f8fafc;
-  --cow-msg-user-bg: rgba(14, 165, 233, 0.1);
-  --cow-msg-ai-bg: #f8fafc;
-  --code-editor-bg: #f8fafc;
-  --code-editor-header: #f1f5f9;
-  --code-editor-border: #e2e8f0;
-  --code-editor-text: #1e293b;
+html {
+  font-size: 16px;
+  position: relative;
+  min-height: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
-/* ==========================================================================
-   Utility Classes & UI State Management (Mục 13 UX.md)
-   ========================================================================== */
+html, body {
+  background-color: var(--cow-bg);
+  color: var(--cow-text);
+  transition: background-color var(--transition-slow), color var(--transition-slow);
+}
+
+body {
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+code, kbd, samp, pre, .font-mono {
+  font-family: var(--font-mono);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.22;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+small,
+.ai-badge,
+.ai-chip,
+.ai-label__sub,
+.input-hint {
+  letter-spacing: 0.01em;
+}
+
+/* Three.js Canvas Background Container (Permanently Disabled) */
+#three-canvas,
+#bg-canvas {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Unified Obsidian Dark & Clean Paper Light Backgrounds */
+html.dark,
+body.dark,
+html.dark body {
+  background-color: var(--cow-bg) !important;
+  background: var(--cow-bg) !important;
+}
+
+html.light,
+body.light,
+html.light body {
+  background-color: var(--cow-bg) !important;
+  background: var(--cow-bg) !important;
+}
+
+/* 4-Layer Atmospheric Backdrop (Silk Mesh + Curved Horizon Arc + Studio Vignette + Interactive Spotlight)
+   Chỉ áp dụng Web chính — Studio giữ nguyên nền phẳng đơn sắc */
+body:not(.studio-standalone-body)::before,
+body:not(.studio-standalone-body)::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body:not(.studio-standalone-body)::before {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='arc' x1='0%25' y1='0%25' x2='100%25' y2='0%25'%3E%3Cstop offset='0%25' stop-color='%2338bdf8' stop-opacity='0'/%3E%3Cstop offset='26%25' stop-color='%237dd3fc' stop-opacity='0.14'/%3E%3Cstop offset='50%25' stop-color='%23bae6fd' stop-opacity='0.34'/%3E%3Cstop offset='74%25' stop-color='%237dd3fc' stop-opacity='0.14'/%3E%3Cstop offset='100%25' stop-color='%2338bdf8' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M-40 280 Q720 42 1480 280' fill='none' stroke='url(%23arc)' stroke-width='1.2'/%3E%3C/svg%3E"),
+    radial-gradient(620px circle at var(--cow-mx, 50%) var(--cow-my, 20%), var(--cow-cursor-glow), transparent 68%),
+    radial-gradient(ellipse 76% 44% at 50% -4%, var(--cow-silk-primary), transparent 68%),
+    radial-gradient(ellipse 52% 40% at 84% 14%, var(--cow-silk-secondary), transparent 72%),
+    radial-gradient(ellipse 56% 42% at 16% 88%, var(--cow-silk-ambient), transparent 74%),
+    radial-gradient(ellipse 92% 82% at 50% 24%, var(--cow-vignette-center) 0%, var(--cow-bg) 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 300px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: center 48px, center center, center top, center top, center bottom, center center;
+}
+
+html.light body:not(.studio-standalone-body)::before {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='arcL' x1='0%25' y1='0%25' x2='100%25' y2='0%25'%3E%3Cstop offset='0%25' stop-color='%230284c7' stop-opacity='0'/%3E%3Cstop offset='26%25' stop-color='%230284c7' stop-opacity='0.1'/%3E%3Cstop offset='50%25' stop-color='%230284c7' stop-opacity='0.24'/%3E%3Cstop offset='74%25' stop-color='%230284c7' stop-opacity='0.1'/%3E%3Cstop offset='100%25' stop-color='%230284c7' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M-40 280 Q720 42 1480 280' fill='none' stroke='url(%23arcL)' stroke-width='1.2'/%3E%3C/svg%3E"),
+    radial-gradient(620px circle at var(--cow-mx, 50%) var(--cow-my, 20%), var(--cow-cursor-glow), transparent 68%),
+    radial-gradient(ellipse 76% 44% at 50% -4%, var(--cow-silk-primary), transparent 68%),
+    radial-gradient(ellipse 52% 40% at 84% 14%, var(--cow-silk-secondary), transparent 72%),
+    radial-gradient(ellipse 56% 42% at 16% 88%, var(--cow-silk-ambient), transparent 74%),
+    radial-gradient(ellipse 92% 82% at 50% 24%, var(--cow-vignette-center) 0%, var(--cow-bg) 100%);
+}
+
+body:not(.studio-standalone-body)::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  opacity: var(--cow-grain-opacity);
+}
+
+/* Browser Surface Theming (Selection, Caret & Safe Mobile Scaling) */
+::selection {
+  background: var(--cow-accent-soft);
+  color: var(--cow-text);
+}
+
+input, textarea {
+  caret-color: var(--cow-accent);
+}
+
+@media (max-width: 768px) {
+  body:not(.studio-standalone-body)::before {
+    background-size: 140% 210px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+    background-position: center 40px, center center, center top, center top, center bottom, center center;
+  }
+  .main-content {
+    padding-top: 3.75rem;
+  }
+}
+
+/* App Shell Wrapper */
+.app-wrapper {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  padding-top: 4rem;
+}
+
+/* Global Utility States */
 .hidden {
   display: none !important;
 }
@@ -102,7 +290,7 @@ body.light, html.light, html.light body, :root.light {
   width: 1.5rem;
   height: 1.5rem;
   border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: var(--cow-accent, #0EA5E9);
+  border-top-color: var(--cow-accent, #38bdf8);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   vertical-align: middle;
@@ -116,7 +304,7 @@ body.light, html.light, html.light body, :root.light {
   margin-top: 32px;
   background: rgba(20, 20, 25, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 24px;
 }
 
@@ -125,105 +313,10 @@ body.light, html.light, html.light body, :root.light {
   line-height: 1.6;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  font-size: 16px;
-  position: relative;
-  min-height: 100%;
-}
-
-html, body {
-  background-color: var(--cow-bg);
-  color: var(--cow-text);
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-body {
-  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.6; /* Body text line-height: 1.6 - Mục 5.1 */
-  overflow-x: hidden;
-}
-
-code, kbd, samp, pre, .font-mono, textarea.prompt-textarea {
-  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-/* Typography chuẩn SEO & Accessibility (Mục 5.1 ChuanSeo.md) */
-h1, h2, h3, h4, h5, h6 {
-  line-height: 1.2; /* Tiêu đề line-height: 1.2 */
-}
-
-small,
-.ai-badge,
-.ai-chip,
-.ai-label__sub,
-.input-hint,
-button,
-.btn-send,
-.ai-btn-primary,
-.ai-btn-secondary {
-  letter-spacing: 0.5px; /* Giãn chữ 0.5px cho text nhỏ và nút bấm */
-}
-
-/* ==========================================================================
-   Three.js Canvas Background
-   Canvas luôn trong suốt (transparent) để nền Tech Blue / White bên dưới hiển thị mượt mà
-   ========================================================================== */
-#three-canvas,
-#bg-canvas {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 0;
-  pointer-events: none;
-  background: transparent !important;
-  display: block;
-}
-
-/* Nền Dark Mode: Tech Blue Gradient hiển thị đồng nhất toàn trang */
-html.dark,
-body.dark,
-html.dark body {
-  background-color: #0b132b !important;
-  background: linear-gradient(135deg, #0b132b 0%, #1c2541 100%) !important;
-  background-attachment: fixed !important;
-}
-
-/* Nền Light Mode: Trắng ra sáng */
-html.light,
-body.light,
-html.light body {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-  background-attachment: initial !important;
-}
-
-/* ==========================================================================
-   Layout Containers
-   ========================================================================== */
-.app-wrapper {
-  position: relative;
-  z-index: 1;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.main-content {
-  flex: 1;
-  padding-top: 4rem;
-}
-
-/* Scrollbar */
+/* Accessible Global Scrollbar (Thin, 6px, Non-intrusive) */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -231,10 +324,18 @@ html.light body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-sm);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
 }

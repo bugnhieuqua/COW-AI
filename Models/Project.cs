@@ -1,0 +1,49 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace COW_AI.Models;
+
+public class Project
+{
+    [Key]
+    public int Id { get; set; }
+
+    public int? UserId { get; set; }
+
+    [ForeignKey("UserId")]
+    [System.Text.Json.Serialization.JsonIgnore]
+    public User? User { get; set; }
+
+    [Required]
+    [MaxLength(150)]
+    public string Title { get; set; } = "Dự án Studio mới";
+
+    [MaxLength(500)]
+    public string? Description { get; set; }
+
+    [MaxLength(30)]
+    public string Status { get; set; } = "Empty"; // Empty, Reviewing, Processing, Completed
+
+    public string? ScriptJson { get; set; }
+
+    [MaxLength(50)]
+    public string Voice { get; set; } = "Hải Đăng";
+
+    [MaxLength(50)]
+    public string VideoType { get; set; } = "comparison"; // comparison, sequential
+
+    public string? AvatarsJson { get; set; } // JSON array of up to 3 avatar image paths
+
+    public string? PlanMarkdown { get; set; } // Generated Markdown plan (.md)
+
+    [MaxLength(255)]
+    public string? SourceFileName { get; set; }
+
+    public string? SourceContent { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    public List<Scene> Scenes { get; set; } = new();
+}

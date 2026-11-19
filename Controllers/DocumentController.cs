@@ -6,15 +6,18 @@ namespace COW_AI.Controllers;
 public class DocumentController : Controller
 {
     private readonly OpenRouterService _openRouter;
+    private readonly OllamaService _ollama;
     private readonly PromptService _promptService;
     private readonly ILogger<DocumentController>? _logger;
 
     public DocumentController(
-        OpenRouterService openRouter, 
+        OpenRouterService openRouter,
+        OllamaService ollama,
         PromptService promptService,
         ILogger<DocumentController>? logger = null)
     {
         _openRouter = openRouter;
+        _ollama = ollama;
         _promptService = promptService;
         _logger = logger;
     }
@@ -61,7 +64,9 @@ public class DocumentController : Controller
         bool doneSent = false;
         try
         {
-            var stream = await _openRouter.StreamChatAsync(prompt, model, cancellationToken: cancellationToken);
+            var stream = _openRouter.HasValidApiKey()
+                ? await _openRouter.StreamChatAsync(prompt, model, cancellationToken: cancellationToken)
+                : await _ollama.StreamChatAsync(prompt, "cow-ai-local", cancellationToken: cancellationToken);
 
             using var reader = new StreamReader(stream);
             string? line;

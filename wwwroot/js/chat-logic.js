@@ -70,6 +70,105 @@
     });
   }
 
+  const COPY_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+  const CHECK_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+  function copyTextToClipboard(text) {
+    const value = String(text || '');
+    if (!value) {
+      return Promise.reject(new Error('Không có nội dung để sao chép.'));
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      return navigator.clipboard.writeText(value).catch(function () {
+        return fallbackCopyText(value);
+      });
+    }
+
+    return fallbackCopyText(value);
+  }
+
+  function fallbackCopyText(text) {
+    return new Promise(function (resolve, reject) {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.top = '-9999px';
+        textarea.style.left = '-9999px';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = typeof document.execCommand === 'function' && document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (ok) {
+          resolve();
+        } else {
+          reject(new Error('Copy command failed'));
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  function setCopyButtonFeedback(button, labelSpan, state) {
+    if (!button) return;
+    if (button._copyResetTimer) {
+      clearTimeout(button._copyResetTimer);
+      button._copyResetTimer = null;
+    }
+
+    const defaultLabel = button.getAttribute('data-default-label') || 'Sao chép';
+
+    if (state === 'copied') {
+      button.classList.remove('copy-error');
+      button.classList.add('copied');
+      if (labelSpan) {
+        button.innerHTML = CHECK_ICON_SVG + '<span>Đã sao chép</span>';
+      } else {
+        button.innerHTML = CHECK_ICON_SVG;
+      }
+      button.title = 'Đã sao chép';
+      button.setAttribute('aria-label', 'Đã sao chép');
+    } else if (state === 'error') {
+      button.classList.remove('copied');
+      button.classList.add('copy-error');
+      if (labelSpan) {
+        button.innerHTML = COPY_ICON_SVG + '<span>Lỗi sao chép</span>';
+      }
+      button.title = 'Không thể sao chép';
+    }
+
+    button._copyResetTimer = setTimeout(function () {
+      button.classList.remove('copied', 'copy-error');
+      if (labelSpan) {
+        button.innerHTML = COPY_ICON_SVG + '<span>' + defaultLabel + '</span>';
+      } else {
+        button.innerHTML = COPY_ICON_SVG;
+      }
+      button.title = button.getAttribute('data-default-title') || defaultLabel;
+      button.setAttribute('aria-label', button.getAttribute('data-default-title') || defaultLabel);
+      button._copyResetTimer = null;
+    }, 2000);
+  }
+
+  function extractCleanBubbleText(bubble) {
+    if (!bubble) return '';
+    if (typeof bubble.cloneNode === 'function') {
+      const clone = bubble.cloneNode(true);
+      if (typeof clone.querySelectorAll === 'function') {
+        clone.querySelectorAll('.message-actions, .cow-code-block__header').forEach(function (el) {
+          if (el.parentNode) el.parentNode.removeChild(el);
+        });
+      }
+      return String(clone.innerText || clone.textContent || '').trim();
+    }
+    return String(bubble.innerText || bubble.textContent || '').trim();
+  }
+
   function speakText(buttonElement, bubbleElement) {
     const bubble = bubbleElement ||
       (buttonElement && typeof buttonElement.closest === 'function'
@@ -78,7 +177,7 @@
 
     if (!bubble) return;
 
-    const text = String(bubble.innerText || bubble.textContent || '').replace(/\s+/g, ' ').trim();
+    const text = extractCleanBubbleText(bubble).replace(/\s+/g, ' ').trim();
     if (!text) return;
 
     if (typeof Audio === 'undefined') return;
@@ -140,6 +239,32 @@
     const actions = document.createElement('div');
     actions.className = 'message-actions';
 
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'btn-copy-message';
+    copyBtn.title = 'Sao chép câu trả lời';
+    copyBtn.setAttribute('aria-label', 'Sao chép câu trả lời');
+    copyBtn.setAttribute('data-default-title', 'Sao chép câu trả lời');
+    copyBtn.setAttribute('data-default-label', 'Sao chép');
+    copyBtn.innerHTML = COPY_ICON_SVG + '<span>Sao chép</span>';
+
+    copyBtn.addEventListener('click', function (event) {
+      if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+      }
+      const rawContent = (bubble.dataset && bubble.dataset.rawMarkdown)
+        ? bubble.dataset.rawMarkdown
+        : extractCleanBubbleText(bubble);
+
+      copyTextToClipboard(rawContent)
+        .then(function () {
+          setCopyButtonFeedback(copyBtn, true, 'copied');
+        })
+        .catch(function () {
+          setCopyButtonFeedback(copyBtn, true, 'error');
+        });
+    });
+
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'btn-speak';
@@ -154,6 +279,7 @@
       speakText(button, bubble);
     });
 
+    actions.appendChild(copyBtn);
     actions.appendChild(button);
     bubble.appendChild(actions);
   }
@@ -203,6 +329,23 @@
     /\bPollinations:BaseUrl\b/i
   ];
 
+  const STREAM_LEAK_ERROR_PATTERNS = [
+    /OpenRouter:ApiKey/i,
+    /OpenRouter__ApiKey/i,
+    /OPENROUTER_API_KEY/i,
+    /\bsk-or-v1-[a-zA-Z0-9_\-]{12,}\b/i,
+    /dotnet\s+user-secrets/i,
+    /Microsoft\.AspNetCore\.Diagnostics/i,
+    /Unhandled\s+exception\b/i
+  ];
+
+  function isServerLeakToken(text) {
+    if (!text || typeof text !== 'string') return false;
+    return STREAM_LEAK_ERROR_PATTERNS.some(function (pattern) {
+      return pattern.test(text);
+    });
+  }
+
   function sanitizeErrorMessage(rawMessage) {
     if (!rawMessage || typeof rawMessage !== 'string') {
       return 'Hệ thống AI hiện đang bận. Vui lòng thử lại sau ít phút.';
@@ -231,7 +374,71 @@
     }, 150);
   }
 
+  function enhanceCodeBlocks(container) {
+    if (!container || typeof container.querySelectorAll !== 'function') return;
+    const preBlocks = container.querySelectorAll('pre');
+    if (!preBlocks || preBlocks.length === 0) return;
+
+    preBlocks.forEach(function (pre) {
+      if (!pre || !pre.parentNode || typeof pre.parentNode.insertBefore !== 'function') return;
+      if (pre.parentNode.classList && pre.parentNode.classList.contains('cow-code-block')) return;
+
+      const codeElem = typeof pre.querySelector === 'function' ? pre.querySelector('code') : null;
+      let langLabel = 'code';
+      if (codeElem && codeElem.className) {
+        const match = String(codeElem.className).match(/language-([a-zA-Z0-9_+#.-]+)/i);
+        if (match && match[1]) {
+          langLabel = match[1].toLowerCase();
+        }
+      }
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'cow-code-block';
+
+      const header = document.createElement('div');
+      header.className = 'cow-code-block__header';
+
+      const langSpan = document.createElement('span');
+      langSpan.className = 'cow-code-block__lang';
+      langSpan.textContent = langLabel;
+
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'cow-code-block__copy';
+      copyBtn.title = 'Sao chép mã nguồn';
+      copyBtn.setAttribute('aria-label', 'Sao chép mã nguồn ' + langLabel);
+      copyBtn.setAttribute('data-default-title', 'Sao chép mã nguồn');
+      copyBtn.setAttribute('data-default-label', 'Sao chép');
+      copyBtn.innerHTML = COPY_ICON_SVG + '<span>Sao chép</span>';
+
+      copyBtn.addEventListener('click', function (event) {
+        if (event && typeof event.preventDefault === 'function') {
+          event.preventDefault();
+        }
+        const codeText = codeElem ? (codeElem.textContent || '') : (pre.textContent || '');
+        copyTextToClipboard(codeText)
+          .then(function () {
+            setCopyButtonFeedback(copyBtn, true, 'copied');
+          })
+          .catch(function () {
+            setCopyButtonFeedback(copyBtn, true, 'error');
+          });
+      });
+
+      header.appendChild(langSpan);
+      header.appendChild(copyBtn);
+
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(header);
+      wrapper.appendChild(pre);
+    });
+  }
+
   function renderMarkdown(element, markdownText, isStreaming) {
+    if (element && element.dataset) {
+      element.dataset.rawMarkdown = String(markdownText || '');
+    }
+
     if (typeof window !== 'undefined' && window.marked && typeof window.marked.parse === 'function') {
       try {
         element.innerHTML = window.marked.parse(markdownText, { breaks: true, gfm: true });
@@ -251,6 +458,10 @@
       }
     } else {
       element.textContent = markdownText;
+    }
+
+    if (!isStreaming) {
+      enhanceCodeBlocks(element);
     }
 
     // Bind auto-scroll to any dynamically rendered images
@@ -610,9 +821,25 @@
       const aiMsgRow = document.createElement('div');
       aiMsgRow.className = 'message ai chat-message chat-message--ai';
 
+      const trimmedCheck = (rawPrompt || prompt || '').trim();
+      const isLocalImgRequest = (selectedModel || '').toLowerCase() === 'local-image' ||
+        /^\/(?:imags|localimg|localimage)(?:\s|:|$)/i.test(trimmedCheck);
+      const isCodeSkillRequest = /^\/(?:code|dev|laptrinh)(?:\s|:|$)/i.test(trimmedCheck);
+      const isSearchSkillRequest = (selectedModel || '').toLowerCase() === 'duckduckgo' ||
+        /^\/(?:search|tim|web)(?:\s|:|$)/i.test(trimmedCheck);
+
+      let loadingLabel = 'Đang suy nghĩ...';
+      if (isLocalImgRequest) {
+        loadingLabel = 'Đang vẽ ảnh với SDXL Turbo...';
+      } else if (isCodeSkillRequest) {
+        loadingLabel = 'Đang lập trình chuyên sâu (/code)...';
+      } else if (isSearchSkillRequest) {
+        loadingLabel = 'Đang tra cứu web (/search)...';
+      }
+
       aiBubble = document.createElement('div');
       aiBubble.className = 'message-bubble chat-bubble chat-bubble-ai';
-      aiBubble.innerHTML = '<div class="ai-status-loading ai-thinking-indicator"><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span> <span class="ai-status-text">Đang suy nghĩ...</span></div>';
+      aiBubble.innerHTML = `<div class="ai-status-loading ai-thinking-indicator"><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span> <span class="ai-status-text">${loadingLabel}</span></div>`;
 
       aiMsgRow.appendChild(aiBubble);
       chatHistory.appendChild(aiMsgRow);
@@ -630,11 +857,17 @@
       }
     }
 
-    // 5. Xác định model đã chọn (Edge TTS hoặc model AI)
+    // 5. Xác định model đã chọn (Edge TTS / skill /tts hoặc model AI)
+    const ttsSlashMatch = String(prompt || '').trim().match(/^\/(?:tts|speak|doc)(?:\s+|:)(.+)$/is);
+    const isEdgeTtsSkill = Boolean(ttsSlashMatch);
+    const effectiveTtsText = ttsSlashMatch ? ttsSlashMatch[1].trim() : prompt;
+    const effectiveTtsModel = (selectedModel === 'edge-male' || selectedModel === 'edge-female')
+      ? selectedModel
+      : 'edge-female';
 
     // 5.1. Edge TTS: phát trực tiếp file MP3 trả về kèm nút Play/Pause và Tải xuống MP3
-    if (selectedModel === 'edge-male' || selectedModel === 'edge-female') {
-      const voiceName = selectedModel === 'edge-male' ? 'vi-VN-NamMinhNeural' : 'vi-VN-HoaiMyNeural';
+    if (selectedModel === 'edge-male' || selectedModel === 'edge-female' || isEdgeTtsSkill) {
+      const voiceName = effectiveTtsModel === 'edge-male' ? 'vi-VN-NamMinhNeural' : 'vi-VN-HoaiMyNeural';
       if (document.body) {
         document.body.setAttribute('data-tts-voice', voiceName);
       }
@@ -654,15 +887,15 @@
         return;
       }
 
-      const audioUrl = '/Home/StreamChat?prompt=' + encodeURIComponent(prompt) +
-        '&model=' + encodeURIComponent(selectedModel);
+      const audioUrl = '/Home/StreamChat?prompt=' + encodeURIComponent(effectiveTtsText) +
+        '&model=' + encodeURIComponent(effectiveTtsModel);
 
       if (aiBubble) {
-        renderAudioPlayer(aiBubble, audioUrl, prompt, voiceName, scrollToBottom);
+        renderAudioPlayer(aiBubble, audioUrl, effectiveTtsText, voiceName, scrollToBottom);
       }
 
       if (window.CowAiHistoryStore) {
-        window.CowAiHistoryStore.addMessage('assistant', '[Bản ghi âm giọng đọc: "' + prompt + '"]', selectedModel);
+        window.CowAiHistoryStore.addMessage('assistant', '[Bản ghi âm giọng đọc: "' + effectiveTtsText + '"]', effectiveTtsModel);
         if (typeof window.renderSessionList === 'function') {
           window.renderSessionList();
         }
@@ -719,7 +952,7 @@
 
         const deltaContent = json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.text;
         if (deltaContent !== undefined && deltaContent !== null) {
-          if (typeof deltaContent === 'string' && (deltaContent.trim().startsWith('[ERROR]') || TECHNICAL_ERROR_PATTERNS.some(function (p) { return p.test(deltaContent); }))) {
+          if (typeof deltaContent === 'string' && (deltaContent.trim().startsWith('[ERROR]') || (isServerLeakToken(deltaContent) && TECHNICAL_ERROR_PATTERNS.some(function (p) { return p.test(deltaContent); })))) {
             const errMsg = deltaContent.trim().replace(/^\[ERROR\]\s*/, '');
             const safeMsg = sanitizeErrorMessage(errMsg);
             if (aiBubble) {
@@ -955,16 +1188,332 @@
     const clearChatBtn = document.getElementById('clearChatBtn');
     const clearImageBtn = document.getElementById('clearImageBtn');
 
+    const DEFAULT_PROMPT_PLACEHOLDER = 'Hỏi bất kỳ điều gì hoặc gõ / để chọn kỹ năng (/imags, /code)...';
+
+    /* ========================================================================
+       1.5. Slash Skills Autocomplete Palette (/imags, /code, /image, /search, /tts)
+       ======================================================================== */
+    const FALLBACK_SKILLS = [
+      {
+        command: '/imags',
+        aliases: ['/localimg', '/localimage'],
+        name: 'Tạo ảnh AI Siêu tốc',
+        badge: 'SDXL Turbo',
+        badgeType: 'local',
+        category: 'featured',
+        categoryLabel: 'Kỹ năng chính',
+        icon: 'image-gpu',
+        description: 'Sinh ảnh tức thì bằng SDXL Turbo chất lượng cao (2–5 giây)',
+        placeholder: 'Mô tả ảnh cần vẽ (ví dụ: chú bò đeo kính râm trên bãi biển 16:9)...'
+      },
+      {
+        command: '/code',
+        aliases: ['/dev', '/laptrinh'],
+        name: 'Lập trình chuyên sâu',
+        badge: 'Code Pro',
+        badgeType: 'code',
+        category: 'featured',
+        categoryLabel: 'Kỹ năng chính',
+        icon: 'code',
+        description: 'Sinh mã nguồn sạch, tối ưu thuật toán theo chuẩn Markdown kèm nút Sao chép',
+        placeholder: 'Nhập yêu cầu lập trình (ví dụ: viết API ASP.NET Core hoặc thuật toán Dijkstra bằng Python)...'
+      },
+      {
+        command: '/image',
+        aliases: ['/img', '/draw', '/ve'],
+        name: 'Tạo ảnh Cloud',
+        badge: 'Pollinations',
+        badgeType: 'cloud',
+        category: 'builtin',
+        categoryLabel: 'Kỹ năng mở rộng',
+        icon: 'image-cloud',
+        description: 'Tạo ảnh nghệ thuật trực tuyến qua Pollinations AI (tự dịch Việt → Anh)',
+        placeholder: 'Mô tả ảnh nghệ thuật cần tạo qua Pollinations Cloud...'
+      },
+      {
+        command: '/search',
+        aliases: ['/tim', '/web'],
+        name: 'Tìm kiếm Web',
+        badge: 'DuckDuckGo',
+        badgeType: 'cloud',
+        category: 'builtin',
+        categoryLabel: 'Kỹ năng mở rộng',
+        icon: 'search',
+        description: 'Tra cứu thông tin trực tiếp trên web qua DuckDuckGo',
+        placeholder: 'Nhập từ khóa cần tra cứu trên web...'
+      },
+      {
+        command: '/tts',
+        aliases: ['/speak', '/doc'],
+        name: 'Đọc giọng nói tiếng Việt',
+        badge: 'Edge TTS',
+        badgeType: 'audio',
+        category: 'builtin',
+        categoryLabel: 'Kỹ năng mở rộng',
+        icon: 'audio',
+        description: 'Chuyển văn bản thành giọng đọc tiếng Việt tự nhiên kèm trình phát & tải MP3',
+        placeholder: 'Nhập văn bản tiếng Việt cần đọc thành giọng nói...'
+      }
+    ];
+
+    const skillsPopover = document.getElementById('skillsPopover');
+    const skillsTriggerBtn = document.getElementById('skillsTriggerBtn');
+    let availableSkills = FALLBACK_SKILLS.slice();
+    let filteredSkills = [];
+    let activeSkillIndex = 0;
+    let isSkillsOpen = false;
+
+    function getSkillIconSvg(iconType) {
+      switch (iconType) {
+        case 'image-gpu':
+          return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
+        case 'code':
+          return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>';
+        case 'image-cloud':
+          return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>';
+        case 'search':
+          return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
+        case 'audio':
+          return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+        default:
+          return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>';
+      }
+    }
+
+    // Nạp danh sách Skills từ Prompts/Skills.json qua API /api/skills
+    if (typeof fetch === 'function' && skillsPopover) {
+      fetch('/api/skills')
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          if (Array.isArray(data) && data.length > 0) {
+            availableSkills = data;
+          }
+        })
+        .catch(function () {
+          // Giữ FALLBACK_SKILLS khi offline hoặc trong môi trường test
+        });
+    }
+
+    function closeSkillsPopover() {
+      isSkillsOpen = false;
+      filteredSkills = [];
+      activeSkillIndex = 0;
+      if (skillsPopover) {
+        skillsPopover.classList.add('hidden');
+        skillsPopover.innerHTML = '';
+      }
+      if (skillsTriggerBtn) {
+        skillsTriggerBtn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function updatePlaceholderForInput(val) {
+      if (!promptInput) return;
+      const trimmed = String(val || '').trimStart();
+      if (!trimmed.startsWith('/')) {
+        const hiddenModel = document.getElementById('hiddenSelectedModel');
+        const curVal = hiddenModel ? hiddenModel.value : '';
+        if (curVal !== 'edge-male' && curVal !== 'edge-female') {
+          promptInput.placeholder = DEFAULT_PROMPT_PLACEHOLDER;
+        }
+        return;
+      }
+
+      const cmdToken = trimmed.split(/\s+/)[0].toLowerCase();
+      const matched = availableSkills.find(function (s) {
+        return s.command.toLowerCase() === cmdToken ||
+          (Array.isArray(s.aliases) && s.aliases.some(function (a) { return a.toLowerCase() === cmdToken; }));
+      });
+      if (matched && matched.placeholder) {
+        promptInput.placeholder = matched.placeholder;
+      }
+    }
+
+    function selectSkill(skill) {
+      if (!skill || !promptInput) return;
+      const currentVal = String(promptInput.value || '');
+      const afterCmd = currentVal.replace(/^\/\S*\s*/, '');
+      promptInput.value = skill.command + ' ' + afterCmd;
+      promptInput.style.height = 'auto';
+      promptInput.style.height = Math.min(promptInput.scrollHeight, 180) + 'px';
+      if (skill.placeholder) {
+        promptInput.placeholder = skill.placeholder;
+      }
+      closeSkillsPopover();
+      promptInput.focus();
+      if (typeof promptInput.setSelectionRange === 'function') {
+        const pos = promptInput.value.length;
+        promptInput.setSelectionRange(pos, pos);
+      }
+    }
+
+    function renderSkillsPopover(queryText) {
+      if (!skillsPopover) return;
+      const q = String(queryText || '').trim().toLowerCase();
+      const qNoSlash = q.startsWith('/') ? q.slice(1) : q;
+
+      filteredSkills = availableSkills.filter(function (s) {
+        if (!qNoSlash) return true;
+        const inCmd = s.command.toLowerCase().includes(qNoSlash);
+        const inName = String(s.name || '').toLowerCase().includes(qNoSlash);
+        const inDesc = String(s.description || '').toLowerCase().includes(qNoSlash);
+        const inAliases = Array.isArray(s.aliases) && s.aliases.some(function (a) {
+          return a.toLowerCase().includes(qNoSlash);
+        });
+        return inCmd || inName || inDesc || inAliases;
+      });
+
+      if (filteredSkills.length === 0) {
+        closeSkillsPopover();
+        return;
+      }
+
+      if (activeSkillIndex >= filteredSkills.length) {
+        activeSkillIndex = 0;
+      }
+
+      isSkillsOpen = true;
+      skillsPopover.classList.remove('hidden');
+      if (skillsTriggerBtn) {
+        skillsTriggerBtn.setAttribute('aria-expanded', 'true');
+      }
+
+      let html = '<div class="skills-popover__header">' +
+        '<span class="skills-popover__title">Kỹ năng nhanh (Slash Skills)</span>' +
+        '<span class="skills-popover__hint">↑↓ chọn · Enter/Tab chèn · Esc đóng</span>' +
+        '</div><div class="skills-popover__list">';
+
+      let lastCategory = null;
+      filteredSkills.forEach(function (skill, idx) {
+        const catLabel = skill.categoryLabel || (skill.category === 'featured' ? 'Kỹ năng chính' : 'Kỹ năng mở rộng');
+        if (catLabel !== lastCategory) {
+          html += '<div class="skills-popover__group">' + escapeHtml(catLabel) + '</div>';
+          lastCategory = catLabel;
+        }
+
+        const isActive = idx === activeSkillIndex;
+        const badgeClass = 'skills-popover__badge skills-popover__badge--' + escapeHtml(skill.badgeType || 'cloud');
+
+        html += '<button type="button" class="skills-popover__item' + (isActive ? ' active' : '') + '" ' +
+          'role="option" aria-selected="' + String(isActive) + '" data-skill-index="' + idx + '">' +
+          '<span class="skills-popover__icon skills-popover__icon--' + escapeHtml(skill.badgeType || 'cloud') + '">' + getSkillIconSvg(skill.icon) + '</span>' +
+          '<span class="skills-popover__body">' +
+            '<span class="skills-popover__top">' +
+              '<code class="skills-popover__cmd">' + escapeHtml(skill.command) + '</code>' +
+              '<span class="skills-popover__name">' + escapeHtml(skill.name) + '</span>' +
+              (skill.badge ? '<span class="' + badgeClass + '">' + escapeHtml(skill.badge) + '</span>' : '') +
+            '</span>' +
+            '<span class="skills-popover__desc">' + escapeHtml(skill.description || '') + '</span>' +
+          '</span>' +
+        '</button>';
+      });
+
+      html += '</div>';
+      skillsPopover.innerHTML = html;
+
+      if (typeof skillsPopover.querySelectorAll === 'function') {
+        skillsPopover.querySelectorAll('.skills-popover__item').forEach(function (btn) {
+          btn.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            const idx = parseInt(btn.getAttribute('data-skill-index'), 10);
+            if (!isNaN(idx) && filteredSkills[idx]) {
+              selectSkill(filteredSkills[idx]);
+            }
+          });
+          btn.addEventListener('mouseenter', function () {
+            const idx = parseInt(btn.getAttribute('data-skill-index'), 10);
+            if (!isNaN(idx) && idx !== activeSkillIndex) {
+              activeSkillIndex = idx;
+              skillsPopover.querySelectorAll('.skills-popover__item').forEach(function (item, i) {
+                const match = i === activeSkillIndex;
+                item.classList.toggle('active', match);
+                item.setAttribute('aria-selected', String(match));
+              });
+            }
+          });
+        });
+      }
+    }
+
+    function syncSkillsPopoverFromInput() {
+      if (!promptInput || !skillsPopover) return;
+      const val = String(promptInput.value || '');
+      updatePlaceholderForInput(val);
+
+      // Chỉ bật popover khi bắt đầu bằng "/" và chưa gõ khoảng trắng (đang chọn tên lệnh)
+      if (/^\/\S*$/.test(val)) {
+        renderSkillsPopover(val);
+      } else if (isSkillsOpen) {
+        closeSkillsPopover();
+      }
+    }
+
+    if (skillsTriggerBtn && promptInput) {
+      skillsTriggerBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isSkillsOpen) {
+          closeSkillsPopover();
+          promptInput.focus();
+        } else {
+          if (!String(promptInput.value || '').startsWith('/')) {
+            promptInput.value = '/' + String(promptInput.value || '').trimStart();
+          }
+          activeSkillIndex = 0;
+          renderSkillsPopover('/');
+          promptInput.focus();
+        }
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      if (!isSkillsOpen) return;
+      const target = e && e.target;
+      const insidePopover = skillsPopover && typeof skillsPopover.contains === 'function' && skillsPopover.contains(target);
+      const insideTrigger = skillsTriggerBtn && typeof skillsTriggerBtn.contains === 'function' && skillsTriggerBtn.contains(target);
+      const insideInput = promptInput && target === promptInput;
+      if (!insidePopover && !insideTrigger && !insideInput) {
+        closeSkillsPopover();
+      }
+    });
+
     if (promptInput) {
       promptInput.addEventListener('input', function () {
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 180) + 'px';
+        syncSkillsPopoverFromInput();
       });
 
       promptInput.addEventListener('keydown', function (event) {
+        if (isSkillsOpen && filteredSkills.length > 0) {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            activeSkillIndex = (activeSkillIndex + 1) % filteredSkills.length;
+            renderSkillsPopover(this.value);
+            return;
+          }
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            activeSkillIndex = (activeSkillIndex - 1 + filteredSkills.length) % filteredSkills.length;
+            renderSkillsPopover(this.value);
+            return;
+          }
+          if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+            event.preventDefault();
+            selectSkill(filteredSkills[activeSkillIndex] || filteredSkills[0]);
+            return;
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            closeSkillsPopover();
+            return;
+          }
+        }
+
         if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
           if (this.value.trim().length > 0) {
+            closeSkillsPopover();
             startChat();
           }
         }
@@ -1234,7 +1783,7 @@
   }
 
   /* ==========================================================================
-     2. Image Generation (Mục 5.3 & Kết nối Backend Pollinations)
+     2. Image Generation (Mục 5.3 - model ảnh cục bộ SDXL Turbo)
      ========================================================================== */
   function initImageGen() {
     const form = document.getElementById('imageGenForm');
@@ -1242,7 +1791,8 @@
     const submitBtn = document.getElementById('imageSubmitBtn');
     const btnSpinner = document.getElementById('imageBtnSpinner');
     const btnText = document.getElementById('imageBtnText');
-    const quotaBadge = document.getElementById('imageQuotaBadge');
+    const engineBadge = document.getElementById('imageEngineBadge');
+    const engineBadgeText = document.getElementById('imageEngineBadgeText');
     const statusTag = document.getElementById('imageStatusTag');
     const previewContainer = document.getElementById('imagePreviewContainer');
     const emptyState = document.getElementById('imageEmptyState');
@@ -1259,7 +1809,34 @@
       return;
     }
 
-    let remainingQuota = 5;
+    const emptyStateMarkup = emptyState ? emptyState.innerHTML : '';
+
+    // Chip trạng thái model ảnh cục bộ (SDXL Turbo qua sd-server)
+    function setEngineState(state, text) {
+      if (!engineBadge) return;
+      engineBadge.classList.remove('is-checking', 'is-offline');
+      if (state === 'checking') engineBadge.classList.add('is-checking');
+      if (state === 'offline') engineBadge.classList.add('is-offline');
+      if (engineBadgeText) engineBadgeText.textContent = text;
+    }
+
+    async function refreshLocalStatus() {
+      setEngineState('checking', 'Đang kết nối SDXL Turbo…');
+      try {
+        const res = await fetch('/Image/LocalStatus', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('status ' + res.status);
+        const data = await res.json();
+        if (data && data.online) {
+          setEngineState('online', `${data.engine || 'SDXL Turbo'} · Sẵn sàng`);
+        } else {
+          setEngineState('offline', data && data.auto_start ? 'Đang khởi động…' : 'Chưa kết nối');
+        }
+      } catch {
+        setEngineState('offline', 'Không thể kết nối máy chủ ảnh');
+      }
+    }
+
+    refreshLocalStatus();
 
     function setupChips(chips) {
       chips.forEach(function (chip) {
@@ -1280,30 +1857,21 @@
         return;
       }
 
-      if (remainingQuota <= 0) {
-        if (quotaBadge) {
-          quotaBadge.textContent = '⚠️ Hết lượt hôm nay';
-        }
-        return;
-      }
-
-      remainingQuota--;
-      if (quotaBadge) {
-        quotaBadge.textContent = '⚡ Còn ' + remainingQuota + '/5 lượt hôm nay';
-      }
-
       if (submitBtn) submitBtn.disabled = true;
       if (btnSpinner) btnSpinner.classList.remove('hidden');
       if (btnText) btnText.textContent = 'Đang tạo...';
-      if (statusTag) statusTag.textContent = 'Đang xử lý';
+      if (statusTag) statusTag.textContent = 'Đang tạo ảnh nghệ thuật…';
 
       if (previewContainer) {
         previewContainer.className = 'image-preview-frame image-preview-frame--loading';
       }
-      if (emptyState) emptyState.classList.add('hidden');
+      if (emptyState) {
+        emptyState.innerHTML = emptyStateMarkup;
+        emptyState.classList.add('hidden');
+      }
       if (successState) successState.classList.add('hidden');
       if (resultImg) resultImg.classList.add('hidden');
-      if (actionsBar) actionsBar.classList.add('hidden');
+      if (actionsBar) actionsBar.classList.remove('hidden');
       if (loadingState) loadingState.classList.remove('hidden');
 
       try {
@@ -1324,7 +1892,7 @@
         });
 
         if (!response.ok) {
-          let errorMsg = 'Hệ thống tạo ảnh hiện đang bận. Vui lòng thử lại sau ít phút.';
+          let errorMsg = 'Không tạo được ảnh. Kiểm tra máy chủ ảnh rồi thử lại.';
           try {
             const errData = await response.json();
             if (errData && errData.error) {
@@ -1339,29 +1907,34 @@
         if (data && data.error) {
           throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || 'Lỗi khi tạo ảnh.'));
         }
-        if (data && data.url) {
+        if (!data || !data.url) {
+          throw new Error('Máy chủ không trả về đường dẫn ảnh.');
+        }
+
+        await new Promise(function (resolve, reject) {
           const preloader = new Image();
-          preloader.onload = function () {
-            if (loadingState) loadingState.classList.add('hidden');
-            if (successState) successState.classList.remove('hidden');
-            if (resultImg) {
-              resultImg.src = data.url;
-              resultImg.classList.remove('hidden');
-            }
-            if (previewContainer) {
-              previewContainer.className = 'image-preview-frame image-preview-frame--ready';
-            }
-            if (actionsBar) actionsBar.classList.remove('hidden');
-            if (statusTag) statusTag.textContent = 'Hoàn thành';
-            if (submitBtn) submitBtn.disabled = false;
-            if (btnSpinner) btnSpinner.classList.add('hidden');
-            if (btnText) btnText.textContent = 'Tạo ảnh ngay';
-          };
+          preloader.onload = function () { resolve(); };
           preloader.onerror = function () {
-            throw new Error('Lỗi khi tải ảnh tạo bởi Pollinations.');
+            reject(new Error('Không tải được ảnh vừa tạo.'));
           };
           preloader.src = data.url;
+        });
+
+        if (loadingState) loadingState.classList.add('hidden');
+        if (successState) successState.classList.remove('hidden');
+        if (resultImg) {
+          resultImg.src = data.url;
+          resultImg.classList.remove('hidden');
         }
+        if (previewContainer) {
+          previewContainer.className = 'image-preview-frame image-preview-frame--ready';
+        }
+        if (actionsBar) actionsBar.classList.remove('hidden');
+        if (statusTag) statusTag.textContent = `Hoàn thành · ${data.width}×${data.height}`;
+        if (submitBtn) submitBtn.disabled = false;
+        if (btnSpinner) btnSpinner.classList.add('hidden');
+        if (btnText) btnText.textContent = 'Tạo ảnh ngay';
+        if (engineBadge) setEngineState('online', `${data.engine || 'SDXL Turbo'} · Sẵn sàng`);
       } catch (err) {
         if (loadingState) loadingState.classList.add('hidden');
         if (successState) successState.classList.add('hidden');
@@ -1390,7 +1963,15 @@
 
     if (downloadBtn && resultImg) {
       downloadBtn.addEventListener('click', function () {
-        window.open(resultImg.src, '_blank');
+        if (!resultImg.src) return;
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const link = document.createElement('a');
+        link.href = resultImg.src;
+        link.download = `cow-ai-${stamp}.png`;
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
       });
     }
   }
@@ -1585,7 +2166,7 @@
             }
             const token = json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.text;
             if (token !== undefined && token !== null) {
-              if (typeof token === 'string' && (token.trim().startsWith('[ERROR]') || TECHNICAL_ERROR_PATTERNS.some(function (p) { return p.test(token); }))) {
+              if (typeof token === 'string' && (token.trim().startsWith('[ERROR]') || (isServerLeakToken(token) && TECHNICAL_ERROR_PATTERNS.some(function (p) { return p.test(token); })))) {
                 hasError = true;
                 const safeMsg = sanitizeErrorMessage(token.trim().replace(/^\[ERROR\]\s*/, ''));
                 resultContent.innerHTML = `<div class="ai-alert-error">⚠️ ${escapeHtml(safeMsg)}</div>`;
@@ -1811,7 +2392,7 @@
             }
             const token = json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.text;
             if (token !== undefined && token !== null) {
-              if (typeof token === 'string' && (token.trim().startsWith('[ERROR]') || TECHNICAL_ERROR_PATTERNS.some(function (p) { return p.test(token); }))) {
+              if (typeof token === 'string' && (token.trim().startsWith('[ERROR]') || (isServerLeakToken(token) && TECHNICAL_ERROR_PATTERNS.some(function (p) { return p.test(token); })))) {
                 hasError = true;
                 const safeMsg = sanitizeErrorMessage(token.trim().replace(/^\[ERROR\]\s*/, ''));
                 codeOutputBlock.textContent = `// Lỗi: ${safeMsg}`;

@@ -13,6 +13,7 @@ public class OllamaService
     private readonly string _cloudBaseUrl;
     private readonly string _localBaseUrl;
     private readonly string _defaultModel;
+    private readonly string _localDefaultModel;
 
     public OllamaService(HttpClient http, IConfiguration config, ILogger<OllamaService>? logger = null)
     {
@@ -23,6 +24,7 @@ public class OllamaService
         _cloudBaseUrl = config["Ollama:BaseUrl"] ?? "https://ollama.com/v1";
         _localBaseUrl = config["Ollama:FallbackLocalUrl"] ?? "http://localhost:11434/v1";
         _defaultModel = config["Ollama:DefaultModel"] ?? "gpt-oss:20b";
+        _localDefaultModel = config["Ollama:LocalDefaultModel"] ?? "cow-ai:latest";
     }
 
     /// <summary>
@@ -40,9 +42,22 @@ public class OllamaService
         {
             key = key["ollama:".Length..].Trim();
         }
+        else if (key.StartsWith("local:", StringComparison.OrdinalIgnoreCase))
+        {
+            key = key["local:".Length..].Trim();
+        }
+
+        // Ưu tiên ánh xạ cấu hình trong appsettings.json (Ollama:Models)
+        var configured = _config[$"Ollama:Models:{key}"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured.Trim();
+        }
 
         return key.ToLowerInvariant() switch
         {
+            "cow-ai-local" or "cow-ai" or "cow-ai:latest" => _localDefaultModel,
+            "qwen25-coder" or "qwen2.5-coder" or "qwen2.5-coder:7b" => "qwen2.5-coder:7b",
             "gpt20-cloud" or "gpt20" or "gpt-oss-20b" => "gpt-oss:20b",
             "120b-cloud" or "120b" or "gpt-oss-120b" => "gpt-oss:120b",
             "mistral-nemo" or "neu" or "nemo" => "mistral-nemo:latest",
@@ -52,18 +67,32 @@ public class OllamaService
     }
 
     /// <summary>
+    /// Kiểm tra xem một model key có thuộc nhóm chạy cục bộ trên Ollama daemon (localhost:11434) hay không.
+    /// </summary>
+    public static bool IsLocalOllamaModel(string? modelKey)
+    {
+        if (string.IsNullOrWhiteSpace(modelKey)) return false;
+        var key = modelKey.Trim().ToLowerInvariant();
+        if (key.StartsWith("local:")) return true;
+
+        return key is "cow-ai-local" or "cow-ai" or "cow-ai:latest"
+                  or "qwen25-coder" or "qwen2.5-coder" or "qwen2.5-coder:7b";
+    }
+
+    /// <summary>
     /// Kiểm tra xem một model key có thuộc hệ sinh thái Ollama hay không.
     /// </summary>
     public static bool IsOllamaModel(string? modelKey)
     {
         if (string.IsNullOrWhiteSpace(modelKey)) return false;
         var key = modelKey.Trim().ToLowerInvariant();
-        if (key.StartsWith("ollama:")) return true;
+        if (key.StartsWith("ollama:") || key.StartsWith("local:")) return true;
 
-        return key is "gpt20-cloud" or "gpt20" or "gpt-oss-20b" or "gpt-oss:20b"
-                  or "120b-cloud" or "120b" or "gpt-oss-120b" or "gpt-oss:120b"
-                  or "mistral-nemo" or "neu" or "nemo"
-                  or "phi4-cloud" or "phi4" or "phi-4";
+        return IsLocalOllamaModel(key)
+                  || key is "gpt20-cloud" or "gpt20" or "gpt-oss-20b" or "gpt-oss:20b"
+                         or "120b-cloud" or "120b" or "gpt-oss-120b" or "gpt-oss:120b"
+                         or "mistral-nemo" or "neu" or "nemo"
+                         or "phi4-cloud" or "phi4" or "phi-4";
     }
 
     /// <summary>
@@ -76,7 +105,7 @@ public class OllamaService
         int? maxTokens = null, 
         CancellationToken cancellationToken = default)
     {
-        var (targetBaseUrl, apiKey) = GetEndpointAndAuth();
+        var (targetBaseUrl, apiKey) = GetEndpointAndAuth(customModel);
         var modelToUse = ResolveModel(customModel);
 
         var payloadDict = new Dictionary<string, object>
@@ -178,7 +207,7 @@ public class OllamaService
     /// </summary>
     public async Task<string> ChatAsync(string prompt, string? customModel = null, CancellationToken cancellationToken = default)
     {
-        var (targetBaseUrl, apiKey) = GetEndpointAndAuth();
+        var (targetBaseUrl, apiKey) = GetEndpointAndAuth(customModel);
         var modelToUse = ResolveModel(customModel);
 
         var payload = new
@@ -241,8 +270,60 @@ public class OllamaService
         }
     }
 
-    private (string TargetBaseUrl, string? ApiKey) GetEndpointAndAuth()
+    /// <summary>
+    /// Giải phóng VRAM của mọi model đang nạp trên Ollama daemon cục bộ (keep_alive = 0)
+    /// để nhường trọn 8 GB VRAM GPU cho tác vụ tạo ảnh cục bộ (SDXL Turbo).
+    /// </summary>
+    public async Task UnloadActiveModelsAsync(CancellationToken cancellationToken = default)
     {
+        try
+        {
+            var localRoot = _localBaseUrl.TrimEnd('/');
+            if (localRoot.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
+            {
+                localRoot = localRoot[..^3];
+            }
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+            using var psResp = await _http.GetAsync($"{localRoot}/api/ps", cts.Token);
+            if (!psResp.IsSuccessStatusCode) return;
+
+            using var doc = await JsonDocument.ParseAsync(await psResp.Content.ReadAsStreamAsync(cts.Token), cancellationToken: cts.Token);
+            if (!doc.RootElement.TryGetProperty("models", out var models) || models.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (var item in models.EnumerateArray())
+            {
+                if (!item.TryGetProperty("name", out var nameProp)) continue;
+                var modelName = nameProp.GetString();
+                if (string.IsNullOrWhiteSpace(modelName)) continue;
+
+                _logger?.LogInformation("Đang giải phóng VRAM Ollama cho model '{Model}' (keep_alive: 0) trước khi tạo ảnh Local...", modelName);
+                using var unloadReq = new HttpRequestMessage(HttpMethod.Post, $"{localRoot}/api/generate")
+                {
+                    Content = JsonContent.Create(new { model = modelName, keep_alive = 0 })
+                };
+                using var unloadResp = await _http.SendAsync(unloadReq, cts.Token);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger?.LogDebug(ex, "Không cần hoặc không thể giải phóng VRAM Ollama trước khi tạo ảnh Local.");
+        }
+    }
+
+    private (string TargetBaseUrl, string? ApiKey) GetEndpointAndAuth(string? modelKey = null)
+    {
+        // Các model local luôn gọi trực tiếp Ollama daemon trên máy cục bộ (localhost:11434)
+        if (IsLocalOllamaModel(modelKey))
+        {
+            return (_localBaseUrl, null);
+        }
+
         var apiKey = _config["Ollama:ApiKey"] 
             ?? _config["OLLAMA_API_KEY"] 
             ?? _config["OLLAMA"]

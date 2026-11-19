@@ -1,5 +1,35 @@
 @{
-    ViewData["Title"] = "Trang chủ - Trợ lý AI của bạn";
+    ViewData["Title"] = "COW.AI - Trợ lý AI Đa Năng Thông minh & Bảo mật Riêng tư";
+    ViewData["Description"] = "COW.AI - Nền tảng trợ lý trí tuệ nhân tạo: Chat thông minh, lập trình viết code, tóm tắt tài liệu và sản xuất video bài giảng AI tự động. 100% riêng tư và tức thì.";
+    ViewData["CanonicalUrl"] = "https://cow.ai";
+}
+
+@section Head {
+    <script type="application/ld+json">
+    {
+      "@@context": "https://schema.org",
+      "@@graph": [
+        {
+          "@@type": "WebSite",
+          "name": "COW.AI",
+          "url": "https://cow.ai",
+          "inLanguage": "vi-VN"
+        },
+        {
+          "@@type": "SoftwareApplication",
+          "name": "COW.AI Platform",
+          "applicationCategory": "AIPlatform",
+          "operatingSystem": "All",
+          "description": "Nền tảng trí tuệ nhân tạo đa tác vụ hỗ trợ chat, tạo ảnh, tóm tắt văn bản và biên tập video bài giảng.",
+          "offers": {
+            "@@type": "Offer",
+            "price": "0",
+            "priceCurrency": "VND"
+          }
+        }
+      ]
+    }
+    </script>
 }
 
 <div class="chat-app-viewport" id="chatAppViewport">
@@ -20,21 +50,27 @@
                 </div>
 
                 <h1 class="chat-hero-title">
-                    <span class="brand-title-accent">COW.AI</span> - Trợ lý AI <span class="brand-underline">của bạn</span>
+                    <span class="brand-title-accent">COW.AI</span> — Trợ lý AI của bạn
                 </h1>
 
-                <p class="chat-hero-subtitle" style>
-                    All chats are <span class="brand-underline">private</span> | Bảo mật &amp; phản hồi thời gian thực
+                <p class="chat-hero-subtitle">
+                    Riêng tư 100% · Phản hồi tức thì
                 </p>
             </div>
             <!-- Prompt Bar Form -->
             <form id="chatPromptForm" class="prompt-form" onsubmit="return false;">
                 <input type="file" id="chatFileInput" class="hidden" accept=".txt,.md,.cs,.py,.js,.ts,.json,.sql,.html,.css" style="display:none;" />
+
+                <!-- Menu Slash Skills (Hiện tự động khi gõ / hoặc bấm nút /) -->
+                <div id="skillsPopover" class="skills-popover hidden" role="listbox" aria-label="Danh sách kỹ năng COW.AI"></div>
+
                 <div class="gradient-border-box">
                     <div class="input-card">
                         <!-- Thông báo Chế độ Đọc giọng nói (TTS) -->
                         <div id="ttsModeNotice" class="tts-mode-banner hidden">
-                            <span class="tts-mode-banner__icon">🎙️</span>
+                            <span class="tts-mode-banner__icon" aria-hidden="true">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+                            </span>
                             <span class="tts-mode-banner__text">Đang ở chế độ tạo giọng đọc âm thanh</span>
                             <button type="button" id="btnExitTtsMode" class="tts-mode-banner__btn" title="Chuyển về Chat AI">✕ Quay lại Chat AI</button>
                         </div>
@@ -46,15 +82,21 @@
                             id="promptInput" 
                             name="prompt" 
                             rows="1" 
-                            placeholder="Hỏi bất kỳ điều gì hoặc nhập lệnh cho COW.AI..." 
+                            placeholder="Hỏi bất kỳ điều gì hoặc gõ / để chọn kỹ năng (/imags, /code)..." 
                             class="prompt-input prompt-textarea"
                             aria-label="Nhập lệnh cho AI"
+                            aria-autocomplete="list"
+                            aria-controls="skillsPopover"
                         ></textarea>
 
                         <div class="input-card-footer">
                             <div class="input-card-footer__left">
                                 <button type="button" class="btn-attach" id="attachBtn" aria-label="Đính kèm tệp" title="Đính kèm tệp văn bản / mã nguồn">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+                                </button>
+                                <button type="button" class="btn-skills-trigger" id="skillsTriggerBtn" aria-label="Mở danh sách kỹ năng (/)" title="Kỹ năng nhanh (/imags, /code...)" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="btn-skills-trigger__slash">/</span>
+                                    <span class="btn-skills-trigger__label">Skills</span>
                                 </button>
                                 <partial name="_ModelSelector" />
                             </div>
@@ -68,7 +110,7 @@
                                         <line x1="8" y1="23" x2="16" y2="23"></line>
                                     </svg>
                                 </button>
-                                <button type="submit" id="submitBtn" class="prompt-submit btn-send shimmer-btn" aria-label="Gửi lệnh">
+                                <button type="submit" id="submitBtn" class="prompt-submit btn-send" aria-label="Gửi lệnh">
                                     <span>Gửi</span>
                                     <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7" />
@@ -84,25 +126,37 @@
             <div class="chat-suggestions-group" id="chatSuggestionsGroup">
                 <div class="example-prompts">
                     <button type="button" class="example-prompt-btn" data-prompt="Vẽ tranh sơn dầu một chú bò phi hành gia bay lơ lửng giữa dải ngân hà neon" aria-label="Prompt mẫu: Bò phi hành gia">
-                        <span>🎨 Tạo ảnh: Bò phi hành gia giữa dải ngân hà neon</span>
+                        <span class="example-prompt-btn__content">
+                            <svg class="example-prompt-btn__lead" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <span>Tạo ảnh: Bò phi hành gia giữa dải ngân hà neon</span>
+                        </span>
                         <svg class="example-prompt-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
                     <button type="button" class="example-prompt-btn" data-prompt="Tóm tắt các điểm then chốt của quy trình kiểm soát chất lượng phần mềm OWASP" aria-label="Prompt mẫu: Kiểm soát OWASP">
-                        <span>📄 Tóm tắt: Quy trình kiểm soát bảo mật OWASP</span>
+                        <span class="example-prompt-btn__content">
+                            <svg class="example-prompt-btn__lead" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="13" y2="17"></line></svg>
+                            <span>Tóm tắt: Quy trình kiểm soát bảo mật OWASP</span>
+                        </span>
                         <svg class="example-prompt-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
                     <button type="button" class="example-prompt-btn" data-prompt="Viết code Python thuật toán Dijkstra tìm đường đi ngắn nhất có chú thích chi tiết" aria-label="Prompt mẫu: Thuật toán Dijkstra">
-                        <span>💻 Viết code: Thuật toán Dijkstra bằng Python</span>
+                        <span class="example-prompt-btn__content">
+                            <svg class="example-prompt-btn__lead" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                            <span>Viết code: Thuật toán Dijkstra bằng Python</span>
+                        </span>
                         <svg class="example-prompt-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
                     <button type="button" class="example-prompt-btn" data-prompt="Giải thích nguyên lý hoạt động của mạng nơ-ron tích chập (CNN) cho người mới bắt đầu" aria-label="Prompt mẫu: Mạng CNN">
-                        <span>💡 Giải thích: Nguyên lý hoạt động của mạng CNN</span>
+                        <span class="example-prompt-btn__content">
+                            <svg class="example-prompt-btn__lead" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                            <span>Giải thích: Nguyên lý hoạt động của mạng CNN</span>
+                        </span>
                         <svg class="example-prompt-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
@@ -113,23 +167,26 @@
                 <div class="features-grid">
                     <article class="feature-card-wrapper">
                         <a asp-controller="Image" asp-action="Index" class="feature-card">
-                            <div class="feature-card__icon-wrapper">🎨</div>
+                            <div class="feature-card__icon-wrapper" aria-hidden="true">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            </div>
                             <h2 class="feature-card__title">Tạo ảnh AI</h2>
-                            <p class="feature-card__desc">Chuyển hóa văn bản thành tác phẩm nghệ thuật chất lượng cao.</p>
                         </a>
                     </article>
                     <article class="feature-card-wrapper">
                         <a asp-controller="Document" asp-action="Summary" class="feature-card">
-                            <div class="feature-card__icon-wrapper">📄</div>
+                            <div class="feature-card__icon-wrapper" aria-hidden="true">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="13" y2="17"></line></svg>
+                            </div>
                             <h2 class="feature-card__title">Tóm tắt tài liệu</h2>
-                            <p class="feature-card__desc">Nén văn bản và báo cáo dài thành luận điểm cốt lõi súc tích.</p>
                         </a>
                     </article>
                     <article class="feature-card-wrapper">
                         <a asp-controller="Document" asp-action="CodeGen" class="feature-card">
-                            <div class="feature-card__icon-wrapper">💻</div>
+                            <div class="feature-card__icon-wrapper" aria-hidden="true">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                            </div>
                             <h2 class="feature-card__title">Trợ lý viết code</h2>
-                            <p class="feature-card__desc">Sinh mã nguồn chuẩn mực, tối ưu thuật toán đa ngôn ngữ.</p>
                         </a>
                     </article>
                 </div>

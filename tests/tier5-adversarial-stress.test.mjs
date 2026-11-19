@@ -202,6 +202,7 @@ test('Tier 5 - Area 2.1: Live server accepts 10,000 character prompt without cra
 
     assert.strictEqual(res.status, 200, 'Server must return HTTP 200 for 10k character prompt');
     assert.strictEqual(res.headers.get('content-type')?.includes('text/event-stream'), true);
+    await res.body?.cancel();
 });
 
 test('Tier 5 - Area 2.2: Live server accepts 45,000 character prompt without crash', async () => {
@@ -215,6 +216,7 @@ test('Tier 5 - Area 2.2: Live server accepts 45,000 character prompt without cra
     });
 
     assert.strictEqual(res.status, 200, 'Server must return HTTP 200 for 45k character prompt');
+    await res.body?.cancel();
 });
 
 test('Tier 5 - Area 2.3: Comprehensive Vietnamese character set and double diacritics', async () => {
@@ -232,6 +234,7 @@ test('Tier 5 - Area 2.3: Comprehensive Vietnamese character set and double diacr
             body: `prompt=${encodeURIComponent(phrase)}`
         });
         assert.strictEqual(res.status, 200, `Server must accept: "${phrase}"`);
+        await res.body?.cancel();
     }
 });
 
@@ -426,6 +429,7 @@ test('Tier 5 - Area 4.3: Live server rejects whitespace prompt (%20%0A%09) with 
         body: `prompt=${encodeURIComponent('   \t\n   ')}`
     });
     assert.strictEqual(res.status, 400);
+    await res.body?.cancel();
 });
 
 test('Tier 5 - Area 4.4: Live server rejects request with completely missing prompt field with HTTP 400', async () => {
@@ -435,6 +439,7 @@ test('Tier 5 - Area 4.4: Live server rejects request with completely missing pro
         body: 'model=gemini'
     });
     assert.strictEqual(res.status, 400);
+    await res.body?.cancel();
 });
 
 test('Tier 5 - Area 4.5: Live server POST /Home/GenerateImage rejects empty and whitespace prompts', async () => {
@@ -444,6 +449,7 @@ test('Tier 5 - Area 4.5: Live server POST /Home/GenerateImage rejects empty and 
         body: 'prompt='
     });
     assert.strictEqual(res1.status, 400);
+    await res1.body?.cancel();
 
     const res2 = await fetch(`${BASE_URL}/Home/GenerateImage`, {
         method: 'POST',
@@ -451,6 +457,7 @@ test('Tier 5 - Area 4.5: Live server POST /Home/GenerateImage rejects empty and 
         body: `prompt=${encodeURIComponent('     ')}`
     });
     assert.strictEqual(res2.status, 400);
+    await res2.body?.cancel();
 });
 
 /* ==========================================================================

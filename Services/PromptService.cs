@@ -478,6 +478,14 @@ public class PromptService
     }
 
     /// <summary>
+    /// Đọc danh sách Slash Skills từ file ngoài Prompts/Skills.json (Zero Hardcoded Prompts).
+    /// </summary>
+    public string GetSkillsJson()
+    {
+        return GetTemplate("Skills.json", "[]");
+    }
+
+    /// <summary>
     /// Sinh prompt viết code qua template ngoài CodeGeneration.txt (Zero hardcoding)
     /// </summary>
     public string GetCodeGenPrompt(string prompt, string language, string? standards)

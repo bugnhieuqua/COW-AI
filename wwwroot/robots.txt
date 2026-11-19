@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /Image
+Allow: /Document/Summary
+Allow: /Document/CodeGen
+Allow: /studio/about
+Disallow: /studio/editor/
+Disallow: /Account/
+Disallow: /api/
+
+Sitemap: https://cow.ai/sitemap.xml

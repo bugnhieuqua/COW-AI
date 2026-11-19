@@ -1,0 +1,22 @@
+@{
+    ViewData["Title"] = "Không có quyền truy cập";
+}
+
+<section class="auth-page-container" aria-labelledby="deniedHeading">
+    <div class="auth-card glass-panel text-center">
+        <div class="denied-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+            </svg>
+        </div>
+        <h1 id="deniedHeading" class="auth-card__title">403 - Giới hạn quyền truy cập</h1>
+        <p class="auth-card__subtitle">Tài khoản hiện tại không có đủ quyền hạn để truy cập tài nguyên này.</p>
+
+        <div class="profile-actions" style="justify-content: center; margin-top: 24px;">
+            <a asp-controller="Home" asp-action="Index" class="btn-auth-primary">
+                <span>Quay lại trang chủ</span>
+            </a>
+        </div>
+    </div>
+</section>

@@ -1,5 +1,32 @@
 @{
-    ViewData["Title"] = "Tạo ảnh AI - COW.AI";
+    ViewData["Title"] = "Tạo ảnh AI - Sáng tạo Hình ảnh Nghệ thuật Thông minh";
+    ViewData["Description"] = "Tạo ảnh nghệ thuật AI đỉnh cao với SDXL Turbo: Tốc độ tức thì, đa dạng tỉ lệ 1:1, 16:9, 9:16 và phong cách chân thực, 3D, Anime. Riêng tư và không giới hạn trên COW.AI.";
+    ViewData["CanonicalUrl"] = "https://cow.ai/Image";
+}
+
+@section Head {
+    <script type="application/ld+json">
+    {
+      "@@context": "https://schema.org",
+      "@@graph": [
+        {
+          "@@type": "WebApplication",
+          "name": "COW.AI Image Generator",
+          "applicationCategory": "MultimediaApplication",
+          "operatingSystem": "All",
+          "description": "Công cụ tạo ảnh AI đa phong cách với mô hình SDXL Turbo chất lượng cao.",
+          "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "VND" }
+        },
+        {
+          "@@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://cow.ai/" },
+            { "@@type": "ListItem", "position": 2, "name": "Tạo ảnh AI", "item": "https://cow.ai/Image" }
+          ]
+        }
+      ]
+    }
+    </script>
 }
 
 <main class="image-generator-page ai-app-container">
@@ -9,10 +36,10 @@
             <div class="ai-panel__header">
                 <div class="ai-panel__title-group">
                     <h1 class="ai-panel__title">Tạo ảnh AI</h1>
-                    <p class="ai-panel__subtitle">Biến ý tưởng thành tác phẩm nghệ thuật kỹ thuật số đỉnh cao</p>
                 </div>
-                <div class="ai-badge ai-badge--quota" id="imageQuotaBadge">
-                    <span>⚡ Còn 5/5 lượt hôm nay</span>
+                <div class="ai-badge ai-badge--local is-checking" id="imageEngineBadge" title="Mô hình SDXL Turbo sẵn sàng">
+                    <span class="ai-badge__dot" aria-hidden="true"></span>
+                    <span id="imageEngineBadgeText">Đang kết nối SDXL Turbo…</span>
                 </div>
             </div>
 
@@ -20,7 +47,6 @@
                 <div class="ai-form-group">
                     <label for="prompt-input" class="ai-label">
                         <span>Mô tả bức ảnh bạn muốn tạo</span>
-                        <span class="ai-label__sub">Hỗ trợ tiếng Việt & tiếng Anh</span>
                     </label>
                     <textarea 
                         id="prompt-input" 
@@ -54,7 +80,7 @@
                     </div>
                 </div>
 
-                <button type="submit" id="imageSubmitBtn" class="ai-btn-primary shimmer-btn" aria-label="Tạo ảnh ngay">
+                <button type="submit" id="imageSubmitBtn" class="ai-btn-primary" aria-label="Tạo ảnh ngay">
                     <span id="imageBtnSpinner" class="ai-spinner hidden"></span>
                     <span id="imageBtnText">Tạo ảnh ngay</span>
                 </button>
@@ -66,10 +92,9 @@
             <div class="ai-panel__header">
                 <div class="ai-panel__title-group">
                     <h2 class="ai-panel__title">Khung ảnh tác phẩm</h2>
-                    <p class="ai-panel__subtitle">Xem trước kết quả kết xuất ở độ phân giải sắc nét</p>
                 </div>
                 <div class="ai-badge ai-badge--tag" id="imageStatusTag">
-                    <span>Chờ tác vụ</span>
+                    <span>Sẵn sàng</span>
                 </div>
             </div>
 
@@ -79,14 +104,12 @@
                 <div id="imageEmptyState" class="image-preview-empty empty-state">
                     <div class="image-preview-empty__icon">🖼️</div>
                     <div class="image-preview-empty__text">Chưa có ảnh nào được tạo</div>
-                    <div class="image-preview-empty__subtext">Hãy nhập mô tả ở cột bên trái và bấm &ldquo;Tạo ảnh ngay&rdquo;</div>
                 </div>
 
                 <!-- Trạng thái Loading (Ẩn mặc định) -->
                 <div id="imageLoadingState" class="image-preview-loading loading-state hidden">
                     <div class="ai-spinner spinner"></div>
-                    <p class="image-preview-empty__text">AI đang kiến tạo từng nét vẽ...</p>
-                    <p class="image-preview-empty__subtext">Quá trình này mất khoảng 2 - 4 giây</p>
+                    <p class="image-preview-empty__text">Đang tạo ảnh nghệ thuật…</p>
                 </div>
 
                 <!-- Trạng thái Success (Ẩn mặc định) -->
