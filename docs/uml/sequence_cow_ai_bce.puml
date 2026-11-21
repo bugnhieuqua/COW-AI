@@ -1,0 +1,141 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam dpi 300
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 12
+
+skinparam sequence {
+    ArrowColor #1E293B
+    ArrowThickness 1.2
+    LifeLineBorderColor #64748B
+    LifeLineBackgroundColor #F8FAFC
+    
+    ParticipantBackgroundColor #F8FAFC
+    ParticipantBorderColor #334155
+    ParticipantFontColor #0F172A
+    ParticipantFontStyle bold
+    
+    ActorBackgroundColor #FEF3C7
+    ActorBorderColor #D97706
+    ActorFontColor #0F172A
+    
+    BoundaryBackgroundColor #F0FDF4
+    BoundaryBorderColor #16A34A
+    
+    ControlBackgroundColor #EFF6FF
+    ControlBorderColor #2563EB
+    
+    EntityBackgroundColor #FAF5FF
+    EntityBorderColor #9333EA
+    
+    GroupBackgroundColor #F8FAFC
+    GroupBorderColor #475569
+    GroupHeaderFontColor #0F172A
+    GroupHeaderFontStyle bold
+}
+
+autonumber 1 "<b>0</b>"
+
+title BIỂU ĐỒ TRÌNH TỰ TƯƠNG TÁC THỜI GIAN THỰC BCE (SEQUENCE DIAGRAM)
+
+actor "Người dùng" as User
+boundary "Giao Diện Chat\n(UI / Razor View)" as UI
+boundary "Trình Phát Audio\n(AudioPlayer Element)" as Audio
+control "Bộ Điều Khiển Phía Client\n(chat-logic.js)" as ClientCtrl
+control "API Controller\n(HomeController)" as ApiCtrl
+control "Định Tuyến Ý Định\n(IntentDispatcherService)" as IntentSvc
+control "Động Cơ Mẫu Chỉ Thị\n(PromptService)" as PromptSvc
+control "Cổng Kết Nối AI\n(OpenRouter / Ollama)" as AiSvc
+control "Dịch Vụ Giọng Đọc Facade\n(TtsService)" as TtsSvc
+entity "Kho Mẫu Chỉ Thị\n(Prompts Repository)" as PromptRepo
+entity "Lưu Trữ Trình Duyệt\n(HTML5 LocalStorage)" as Storage
+
+User -> UI: Nhập Prompt & nhấn nút Gửi (hoặc STT)
+activate UI
+UI -> ClientCtrl: Kích hoạt sự kiện submitPrompt(text)
+activate ClientCtrl
+ClientCtrl -> UI: Chuyển giao diện sang Dock Mode & Bật Typing Indicator
+ClientCtrl -> ApiCtrl: HTTP POST /Home/StreamChat (prompt, model, temp)
+activate ApiCtrl
+
+ApiCtrl -> IntentSvc: DispatchIntent(prompt)
+activate IntentSvc
+IntentSvc --> ApiCtrl: Trả về kiểu ý định (Chat / Image / Search)
+deactivate IntentSvc
+
+alt #F8FAFC định: Trò chuyện đa mô hình LLM
+    ApiCtrl -> PromptSvc: GetPromptTemplate("PromptTranslation.txt")
+    activate PromptSvc
+    PromptSvc -> PromptRepo: Đọc tệp chỉ thị ngoài (In-Memory Cache)
+    activate PromptRepo
+    PromptRepo --> PromptSvc: Nội dung mẫu chỉ thị
+    deactivate PromptRepo
+    PromptSvc --> ApiCtrl: Mẫu chỉ thị hệ thống
+    deactivate PromptSvc
+    
+    ApiCtrl -> AiSvc: StreamChatAsync(messages, model)
+    activate AiSvc
+    AiSvc --> ApiCtrl: Luồng JSON Chunks (HTTP/2 SSE)
+    deactivate AiSvc
+    ApiCtrl --> ClientCtrl: Kênh Server-Sent Events (SSE Stream)
+    
+    loop Nhận từng chunk token
+        ClientCtrl -> UI: AppendText & Render Markdown / KaTeX
+    end
+
+else #F1F5F9 định: Tra cứu web thời gian thực (DuckDuckGo)
+    ApiCtrl -> IntentSvc: ExecuteWebSearch(query)
+    activate IntentSvc
+    IntentSvc --> ApiCtrl: Trả về kết quả tóm tắt & danh sách URL nguồn
+    deactivate IntentSvc
+    
+    ApiCtrl -> AiSvc: StreamChatWithContextAsync(augmentedPrompt)
+    activate AiSvc
+    AiSvc --> ApiCtrl: Luồng JSON Chunks (HTTP/2 SSE)
+    deactivate AiSvc
+    ApiCtrl --> ClientCtrl: Kênh SSE Stream kèm trích dẫn nguồn
+    ClientCtrl -> UI: Render kết quả tra cứu và liên kết tham khảo
+
+else #EFF6FF định: Sinh ảnh nghệ thuật (Pollinations AI)
+    ApiCtrl -> PromptSvc: GetPromptTemplate("PromptTranslation.txt")
+    activate PromptSvc
+    PromptSvc --> ApiCtrl: Mẫu chỉ thị dịch thuật
+    deactivate PromptSvc
+    
+    ApiCtrl -> ApiCtrl: Dịch và tối ưu hóa mô tả mỹ thuật
+    ApiCtrl --> ClientCtrl: Trả về URL tạo ảnh trực tiếp (Diffusion Stream)
+    ClientCtrl -> UI: Hiển thị thẻ hình ảnh nghệ thuật 1024x1024
+end
+
+deactivate ApiCtrl
+
+ClientCtrl -> UI: Tắt Typing Indicator & Bật nút thao tác
+ClientCtrl -> Storage: SaveConversationToLocalStorage(threadId, messages)
+activate Storage
+Storage --> ClientCtrl: Xác nhận lưu trữ an toàn (Zero Server Footprint)
+deactivate Storage
+deactivate ClientCtrl
+
+opt #FEFCE8 Người dùng nhấn nút "Nghe đọc" (Text-to-Speech)
+    User -> UI: Click nút biểu tượng Loa (Play Audio)
+    UI -> ClientCtrl: Kích hoạt playTtsStream(messageText, voiceName)
+    activate ClientCtrl
+    ClientCtrl -> TtsSvc: HTTP GET /Tts/StreamSpeech?text=...&voice=...
+    activate TtsSvc
+    TtsSvc -> TtsSvc: Ký số DRM Sec-MS-GEC v2 (SHA-256)
+    TtsSvc -> TtsSvc: Đệm dữ liệu MemoryStream & kích hoạt Retry Policy 3 lần
+    TtsSvc --> ClientCtrl: Luồng âm thanh MPEG nhị phân (audio/mpeg)
+    deactivate TtsSvc
+    
+    ClientCtrl -> Audio: Nạp Audio Blob vào Audio Element & Kích hoạt Play()
+    activate Audio
+    Audio -> User: Phát âm thanh giọng đọc tiếng Việt truyền cảm
+    Audio -> UI: Hiển thị nút "Tải xuống MP3"
+    deactivate Audio
+    deactivate ClientCtrl
+end
+deactivate UI
+
+@enduml

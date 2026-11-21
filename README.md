@@ -85,42 +85,121 @@ Hệ thống tích hợp bộ định tuyến thông minh (**Intent Dispatcher**
 
 ![COW-AI System Architecture](assets/architecture.svg)
 
-### 3.2. Sơ Đồ Tuần Tự Tương Tác Đa Kênh (Multi-Channel Sequence Flow)
+### 3.2. Biểu Đồ Trình Tự Tương Tác Thời Gian Thực BCE (Sequence Diagram — UML 2.5)
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Dev as Lập Trình Viên / Người Dùng
-    participant UI as Giao Diện Web (chat-logic.js / Three.js)
-    participant Ctrl as HomeController & API Gateway
-    participant Router as IntentDispatcherService
-    participant LocalAI as Ollama Service (DeepSeek-R1 / Qwen2.5)
-    participant AudioEngine as EdgeTTS / VieNeu-TTS Engine
-    participant VideoEngine as AutoVideo Service (FFmpeg Studio)
+Toàn bộ luồng tương tác giữa Người dùng và hệ thống được thiết kế theo tiêu chuẩn **UML 2.5** áp dụng mô hình kiến trúc phân rã **BCE (Boundary — Control — Entity)**, phản ánh chính xác chuỗi thông điệp tuần tự từ tiếp nhận câu lệnh, phân tích ý định, streaming SSE cho đến tổng hợp giọng nói:
 
-    Dev->>UI: Nhập Prompt hoặc yêu cầu tạo Video/Audio
-    UI->>Ctrl: Gửi Request (HTTP Post / EventSource SSE)
-    
-    alt Yêu cầu Tổng hợp Giọng nói (TTS)
-        Ctrl->>AudioEngine: StreamToResponseAsync(voice, text)
-        AudioEngine-->>Ctrl: Luồng Audio MP3/WAV 48kHz
-        Ctrl-->>UI: Truyền trực tiếp vào thẻ <audio> phát tức thì
-    else Yêu cầu Tạo Video Bài Giảng (Auto-Video)
-        Ctrl->>Router: Phân tích tài liệu nguồn & Cấu trúc Beats
-        Router->>LocalAI: Kích hoạt Agent Biên kịch (qwen2.5:7b)
-        LocalAI-->>Router: Bản kịch bản phân cảnh Markdown chuẩn
-        Ctrl->>VideoEngine: Render FFmpeg (HyperFrames 3-Zone + Subtitle + BGM)
-        VideoEngine-->>UI: Hoàn thành video MP4 1080p@30fps
-    else Yêu cầu Hội thoại Lập trình / Suy luận sâu (SSE Stream)
-        Ctrl->>Router: Nhận diện Intent & Quyết định Model
-        Router->>LocalAI: Nạp DeepSeek-R1 / COW-AI vào GPU
-        loop Truyền luồng Token thời gian thực (SSE)
-            LocalAI-->>Ctrl: Token chunk
-            Ctrl-->>UI: data: {"content": "token"}
-            UI-->>Dev: Render Markdown & Highlight cú pháp Prism.js
-        end
+<p align="center">
+  <img src="assets/seq_cow_ai_interaction.png" alt="Biểu đồ trình tự tương tác thời gian thực BCE (Sequence Diagram)" width="100%" style="border: 1px solid #CBD5E1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.08);" />
+</p>
+
+#### Bảng Phân Rã Đối Tượng Tham Gia (BCE Model Breakdown)
+
+| Tầng Kiến Trúc | Ký Hiệu UML | Thực Thể Phần Mềm | Trách Nhiệm & Vai Trò Nghiệp Vụ |
+| :--- | :---: | :--- | :--- |
+| **Actor** | 👤 | **Người dùng (Developer / User)** | Tác nhân con người khởi phát yêu cầu (gõ văn bản, nói micro STT, đính kèm tệp hoặc bấm phát audio). |
+| **Boundary** | ⭕⊦ | **Giao Diện Chat (`UI / Razor View`)** | Hiển thị bong bóng chat, thanh gõ prompt, hiệu ứng Dock Mode và chuyển động gõ chữ (Typing Indicator). |
+| **Boundary** | ⭕⊦ | **Trình Phát Audio (`AudioPlayer Element`)** | Tiếp nhận Blob nhị phân và phát luồng âm thanh giọng đọc tiếng Việt truyền cảm. |
+| **Control** | ⭕↻ | **Bộ Điều Khiển Phía Client (`chat-logic.js`)** | Quản lý trạng thái giao diện, bắt sự kiện DOM, giải mã luồng SSE và điều phối bộ đệm LocalStorage. |
+| **Control** | ⭕↻ | **API Controller (`HomeController`)** | Điểm tiếp nhận HTTP Request máy chủ, điều phối nghiệp vụ luồng chat, sinh ảnh và tra cứu mạng. |
+| **Control** | ⭕↻ | **Định Tuyến Ý Định (`IntentDispatcherService`)** | Phân tích cú pháp câu lệnh người dùng để phân loại nhánh: `Chat`, `WebSearch` hoặc `GenerateImage`. |
+| **Control** | ⭕↻ | **Động Cơ Mẫu Chỉ Thị (`PromptService`)** | Đọc, nạp bộ nhớ đệm (In-Memory Cache) và hot-reload các mẫu chỉ thị hệ thống từ thư mục `Prompts/`. |
+| **Control** | ⭕↻ | **Cổng Kết Nối AI (`OpenRouter / Ollama`)** | Mở kết nối mạng gọi suy luận từ các mô hình AI cục bộ (DeepSeek-R1, Qwen2.5) hoặc đám mây. |
+| **Control** | ⭕↻ | **Dịch Vụ Giọng Đọc Facade (`TtsService`)** | Ký số xác thực DRM `Sec-MS-GEC v2`, mở WebSocket (WSS) và quản lý cơ chế phục hồi 3x Retry Policy. |
+| **Entity** | ⭕_ | **Kho Mẫu Chỉ Thị (`Prompts Repository`)** | Hệ thống tệp vật lý lưu trữ chỉ thị gốc độc lập với mã nguồn (`PromptTranslation.txt`, v.v.). |
+| **Entity** | ⭕_ | **Lưu Trữ Trình Duyệt (`HTML5 LocalStorage`)** | Lưu trữ lịch sử hội thoại an toàn 100% tại trình duyệt máy khách (Zero Server Footprint). |
+
+#### Đặc Tả Chuỗi Thông Điệp Nghiệp Vụ (37 Bước Tương Tác Chuẩn Mực)
+
+1. **Giai đoạn Tiếp nhận & Định tuyến (Bước 1–6):** Người dùng nhập prompt (hoặc nói STT) ➔ `chat-logic.js` chuyển giao diện sang Dock Mode và bật Typing Indicator ➔ Gửi `HTTP POST /Home/StreamChat` ➔ `HomeController` gọi `IntentDispatcherService.DispatchIntent()` để phân loại ý định xử lý.
+2. **Nhánh Điều Kiện `alt` Phân Luồng Nghiệp Vụ:**
+   - **Nhánh Trò chuyện đa mô hình LLM (Bước 7–14):** `PromptService` nạp mẫu chỉ thị từ `Prompts Repository` ➔ Gọi `OllamaService` hoặc `OpenRouterService` stream token ➔ Trả về luồng JSON Chunks qua `HTTP/2 SSE` ➔ Client giải mã hiển thị Markdown và công thức toán KaTeX thời gian thực.
+   - **Nhánh Tra cứu Web thời gian thực DuckDuckGo (Bước 15–20):** Thực thi tìm kiếm trích xuất dữ liệu web ➔ Bổ sung ngữ cảnh vào Prompt (Augmented Prompt) ➔ Gọi LLM tổng hợp câu trả lời kèm danh sách trích dẫn nguồn minh bạch.
+   - **Nhánh Sinh ảnh nghệ thuật Pollinations AI (Bước 21–25):** Tối ưu hóa prompt mô tả mỹ thuật tiếng Anh ➔ Trả về URL sinh ảnh trực tiếp từ Diffusion Stream ➔ Hiển thị ảnh phân giải cao 1024x1024 trên khung chat.
+3. **Giai đoạn Hoàn tất & Lưu trữ riêng tư (Bước 26–28):** Tắt Typing Indicator ➔ Lưu trữ phiên hội thoại vào `HTML5 LocalStorage` của trình duyệt, bảo đảm không lưu dấu vết dữ liệu trên máy chủ.
+4. **Nhánh Tùy Chọn `opt` Tổng Hợp Giọng Đọc (Bước 29–37):** Khi người dùng bấm biểu tượng Loa ➔ `chat-logic.js` gọi `GET /Tts/StreamSpeech` ➔ `TtsService` ký số DRM `Sec-MS-GEC v2 (SHA-256)` và mở WebSocket tới Microsoft Speech ➔ Đệm luồng MP3 nhị phân và phát trực tiếp qua thẻ `<audio>` kèm nút tải xuống file âm thanh.
+
+<details>
+<summary><b>📄 Xem mã nguồn PlantUML chuẩn hóa (docs/uml/sequence_cow_ai_bce.puml)</b></summary>
+
+```plantuml
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam dpi 300
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 12
+
+autonumber 1 "<b>0</b>"
+
+title BIỂU ĐỒ TRÌNH TỰ TƯƠNG TÁC THỜI GIAN THỰC BCE (SEQUENCE DIAGRAM)
+
+actor "Người dùng" as User
+boundary "Giao Diện Chat\n(UI / Razor View)" as UI
+boundary "Trình Phát Audio\n(AudioPlayer Element)" as Audio
+control "Bộ Điều Khiển Phía Client\n(chat-logic.js)" as ClientCtrl
+control "API Controller\n(HomeController)" as ApiCtrl
+control "Định Tuyến Ý Định\n(IntentDispatcherService)" as IntentSvc
+control "Động Cơ Mẫu Chỉ Thị\n(PromptService)" as PromptSvc
+control "Cổng Kết Nối AI\n(OpenRouter / Ollama)" as AiSvc
+control "Dịch Vụ Giọng Đọc Facade\n(TtsService)" as TtsSvc
+entity "Kho Mẫu Chỉ Thị\n(Prompts Repository)" as PromptRepo
+entity "Lưu Trữ Trình Duyệt\n(HTML5 LocalStorage)" as Storage
+
+User -> UI: Nhập Prompt & nhấn nút Gửi (hoặc STT)
+UI -> ClientCtrl: Kích hoạt sự kiện submitPrompt(text)
+ClientCtrl -> UI: Chuyển giao diện sang Dock Mode & Bật Typing Indicator
+ClientCtrl -> ApiCtrl: HTTP POST /Home/StreamChat (prompt, model, temp)
+
+ApiCtrl -> IntentSvc: DispatchIntent(prompt)
+IntentSvc --> ApiCtrl: Trả về kiểu ý định (Chat / Image / Search)
+
+alt định: Trò chuyện đa mô hình LLM
+    ApiCtrl -> PromptSvc: GetPromptTemplate("PromptTranslation.txt")
+    PromptSvc -> PromptRepo: Đọc tệp chỉ thị ngoài (In-Memory Cache)
+    PromptRepo --> PromptSvc: Nội dung mẫu chỉ thị
+    PromptSvc --> ApiCtrl: Mẫu chỉ thị hệ thống
+    ApiCtrl -> AiSvc: StreamChatAsync(messages, model)
+    AiSvc --> ApiCtrl: Luồng JSON Chunks (HTTP/2 SSE)
+    ApiCtrl --> ClientCtrl: Kênh Server-Sent Events (SSE Stream)
+    loop Nhận từng chunk token
+        ClientCtrl -> UI: AppendText & Render Markdown / KaTeX
     end
+else định: Tra cứu web thời gian thực (DuckDuckGo)
+    ApiCtrl -> IntentSvc: ExecuteWebSearch(query)
+    IntentSvc --> ApiCtrl: Trả về kết quả tóm tắt & danh sách URL nguồn
+    ApiCtrl -> AiSvc: StreamChatWithContextAsync(augmentedPrompt)
+    AiSvc --> ApiCtrl: Luồng JSON Chunks (HTTP/2 SSE)
+    ApiCtrl --> ClientCtrl: Kênh SSE Stream kèm trích dẫn nguồn
+    ClientCtrl -> UI: Render kết quả tra cứu và liên kết tham khảo
+else định: Sinh ảnh nghệ thuật (Pollinations AI)
+    ApiCtrl -> PromptSvc: GetPromptTemplate("PromptTranslation.txt")
+    PromptSvc --> ApiCtrl: Mẫu chỉ thị dịch thuật
+    ApiCtrl -> ApiCtrl: Dịch và tối ưu hóa mô tả mỹ thuật
+    ApiCtrl --> ClientCtrl: Trả về URL tạo ảnh trực tiếp (Diffusion Stream)
+    ClientCtrl -> UI: Hiển thị thẻ hình ảnh nghệ thuật 1024x1024
+end
+
+ClientCtrl -> UI: Tắt Typing Indicator & Bật nút thao tác
+ClientCtrl -> Storage: SaveConversationToLocalStorage(threadId, messages)
+Storage --> ClientCtrl: Xác nhận lưu trữ an toàn (Zero Server Footprint)
+
+opt Người dùng nhấn nút "Nghe đọc" (Text-to-Speech)
+    User -> UI: Click nút biểu tượng Loa (Play Audio)
+    UI -> ClientCtrl: Kích hoạt playTtsStream(messageText, voiceName)
+    ClientCtrl -> TtsSvc: HTTP GET /Tts/StreamSpeech?text=...&voice=...
+    TtsSvc -> TtsSvc: Ký số DRM Sec-MS-GEC v2 (SHA-256)
+    TtsSvc -> TtsSvc: Đệm dữ liệu MemoryStream & kích hoạt Retry Policy 3 lần
+    TtsSvc --> ClientCtrl: Luồng âm thanh MPEG nhị phân (audio/mpeg)
+    ClientCtrl -> Audio: Nạp Audio Blob vào Audio Element & Kích hoạt Play()
+    Audio -> User: Phát âm thanh giọng đọc tiếng Việt truyền cảm
+    Audio -> UI: Hiển thị nút "Tải xuống MP3"
+end
+@enduml
 ```
+
+</details>
 
 ---
 

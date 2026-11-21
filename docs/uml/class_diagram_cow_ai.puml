@@ -1,0 +1,155 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam dpi 300
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 11
+
+skinparam class {
+    BackgroundColor #F8FAFC
+    BorderColor #334155
+    ArrowColor #1E293B
+    HeaderBackgroundColor #F1F5F9
+}
+
+title BIỂU ĐỒ LỚP KIẾN TRÚC HƯỚNG ĐỐI TƯỢNG CÁC THÀNH PHẦN CHÍNH (CLASS DIAGRAM)
+
+class HomeController <<Controller>> {
+    - _dispatcher : IIntentDispatcherService
+    - _promptService : IPromptService
+    - _openRouterService : IOpenRouterService
+    - _ollamaService : OllamaService
+    - _duckDuckGoService : IDuckDuckGoService
+    + Index() : IActionResult
+    + StreamChat(prompt: string, model: string, temp: float) : Task
+    + GenerateImage(prompt: string) : IActionResult
+    + SearchWeb(query: string) : Task<IActionResult>
+}
+
+class DocumentController <<Controller>> {
+    - _promptService : IPromptService
+    - _openRouterService : IOpenRouterService
+    + SummarizeDocument(file: IFormFile) : Task<IActionResult>
+    + ParseDocumentContent(stream: Stream) : Task<string>
+}
+
+class TtsController <<Controller>> {
+    - _ttsService : ITtsService
+    + StreamSpeech(text: string, voice: string) : Task
+    + DownloadMp3(text: string, voice: string) : Task<FileResult>
+}
+
+interface IIntentDispatcherService <<interface>> {
+    + DispatchIntent(input: string) : UserIntentResult
+    + ExtractSearchKeywords(prompt: string) : string
+}
+
+class IntentDispatcherService {
+    - _keywordRules : Dictionary<string, Regex>
+    + DispatchIntent(input: string) : UserIntentResult
+}
+
+interface IDuckDuckGoService <<interface>> {
+    + SearchAsync(query: string, maxResults: int) : Task<WebSearchResult>
+}
+
+class DuckDuckGoService {
+    - _httpClient : HttpClient
+    + SearchAsync(query: string, maxResults: int) : Task<WebSearchResult>
+}
+
+interface IOpenRouterService <<interface>> {
+    + StreamChatAsync(messages: List<ChatMessageItem>, model: string, outStream: Stream, ct: CancellationToken) : Task
+}
+
+class OpenRouterService {
+    - _httpClient : HttpClient
+    - _apiKey : string
+    + StreamChatAsync(messages: List<ChatMessageItem>, model: string, outStream: Stream, ct: CancellationToken) : Task
+}
+
+interface IPromptService <<interface>> {
+    + GetTemplate(templateName: string) : string
+    + FormatPrompt(templateName: string, args: object[]) : string
+    + ReloadTemplates() : void
+}
+
+class PromptService {
+    - _templateCache : ConcurrentDictionary<string, string>
+    + GetTemplate(templateName: string) : string
+    + ReloadTemplates() : void
+}
+
+interface ITtsService <<interface>> {
+    + StreamToResponseAsync(text: string, outputStream: Stream, voiceName: string, ct: CancellationToken) : Task
+}
+
+class TtsService <<Facade>> {
+    - _client : EdgeTtsClient
+    - _defaultVoice : string
+    + StreamToResponseAsync(text: string, outputStream: Stream, voiceName: string, ct: CancellationToken) : Task
+}
+
+class EdgeTtsClient {
+    - _drm : EdgeTtsDrm
+    - _retryCount : int = 3
+    + StreamAsync(text: string, stream: Stream, voice: string, ct: CancellationToken) : Task
+}
+
+class EdgeTtsDrm {
+    + GenerateSecMsGecToken() : string
+    - ComputeModifiedSha256(input: string) : string
+}
+
+class ChatRequestDto <<DTO>> {
+    + Prompt : string
+    + SelectedModel : string
+    + Temperature : float = 0.7
+    + MaxTokens : int = 4096
+}
+
+class UserIntentResult <<DTO>> {
+    + IntentType : UserIntentEnum
+    + ExtractedQuery : string
+    + SuggestedModel : string
+}
+
+class WebSearchResult <<DTO>> {
+    + Query : string
+    + Snippet : string
+    + SourceUrls : List<string>
+}
+
+enum UserIntentEnum <<enumeration>> {
+    Chat
+    GenerateImage
+    WebSearch
+    DocumentSummary
+}
+
+HomeController ..> ChatRequestDto : consumes
+HomeController --> IIntentDispatcherService : injects
+HomeController --> IDuckDuckGoService : injects
+HomeController --> IOpenRouterService : injects
+HomeController --> IPromptService : injects
+
+DocumentController --> IPromptService : injects
+DocumentController --> IOpenRouterService : injects
+
+TtsController --> ITtsService : injects
+
+IntentDispatcherService ..|> IIntentDispatcherService : realizes
+DuckDuckGoService ..|> IDuckDuckGoService : realizes
+OpenRouterService ..|> IOpenRouterService : realizes
+PromptService ..|> IPromptService : realizes
+TtsService ..|> ITtsService : realizes
+
+TtsService --> EdgeTtsClient : wraps (Facade)
+EdgeTtsClient --> EdgeTtsDrm : secures with DRM v2
+
+IntentDispatcherService --> UserIntentResult : produces
+DuckDuckGoService --> WebSearchResult : produces
+UserIntentResult --> UserIntentEnum : classifies
+
+@enduml

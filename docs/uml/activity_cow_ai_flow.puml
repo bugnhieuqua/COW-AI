@@ -1,0 +1,110 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam dpi 300
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 12
+
+skinparam activity {
+    StartColor #0F172A
+    EndColor #0F172A
+    BackgroundColor #F8FAFC
+    BorderColor #334155
+    FontColor #0F172A
+    DiamondBackgroundColor #EFF6FF
+    DiamondBorderColor #2563EB
+    DiamondFontColor #0F172A
+    ArrowColor #1E293B
+}
+
+title BIỂU ĐỒ HOẠT ĐỘNG TOÀN DIỆN HỆ THỐNG COW.AI (UML 2.5 SWIMLANES)
+
+|Client Browser (Giao diện & Logic Trình duyệt)|
+start
+:Khởi động ứng dụng (Index.cshtml);
+:Người dùng chuẩn bị dữ liệu đầu vào (Prompt);
+
+if (Phương thức nhập liệu?) then (Giọng nói STT)
+    :Kích hoạt Web Speech API (voice-input.js);
+    :Ghi âm micro và nhận diện giọng nói tiếng Việt;
+    :Điền văn bản nhận dạng được vào ô nhập Prompt;
+elseif (Đính kèm tệp tin?) then (File Upload)
+    :Tải tệp PDF / Word / TXT / Ảnh qua FileReader;
+    :Trích xuất văn bản thô tại máy khách;
+    :Đóng gói văn bản vào cấu trúc câu lệnh;
+else (Bàn phím)
+    :Nhập câu lệnh trực tiếp từ bàn phím;
+endif
+
+:Nhấn nút [Gửi] hoặc Enter;
+:Chuyển giao diện sang Dock Mode & Bật Typing Indicator;
+:Gửi HTTP POST /Home/StreamChat;
+
+|Máy chủ Ứng dụng (ASP.NET Core .NET 10 Kestrel)|
+:Tiếp nhận Request tại HomeController;
+:Phân tích ý định tại IntentDispatcherService;
+
+if (Kiểu ý định nhận diện?) then (Sinh hình ảnh nghệ thuật)
+    :PromptService nạp mẫu PromptTranslation.txt;
+    :Tối ưu hóa mô tả tiếng Việt sang tiếng Anh;
+    |Dịch vụ Đám mây bên ngoài (External Cloud)|
+    :Gửi yêu cầu tới Pollinations AI Diffusion;
+    :Nhận URL ảnh nghệ thuật kích thước 1024x1024;
+    |Máy chủ Ứng dụng (ASP.NET Core .NET 10 Kestrel)|
+    :Trả về URL hình ảnh trực tiếp;
+    |Client Browser (Giao diện & Logic Trình duyệt)|
+    :Hiển thị thẻ hình ảnh nghệ thuật trên chat;
+elseif (Tra cứu web thời gian thực) then (Tìm kiếm DuckDuckGo)
+    |Máy chủ Ứng dụng (ASP.NET Core .NET 10 Kestrel)|
+    |Dịch vụ Đám mây bên ngoài (External Cloud)|
+    :Gửi truy vấn HTTPS POST tới DuckDuckGo Lite;
+    :Phân tích mã HTML & làm sạch dữ liệu;
+    |Máy chủ Ứng dụng (ASP.NET Core .NET 10 Kestrel)|
+    :Đóng gói trích đoạn web vào ngữ cảnh Prompt;
+    :OpenRouterService mở luồng chat với ngữ cảnh;
+    |Dịch vụ Đám mây bên ngoài (External Cloud)|
+    :Mô hình AI suy luận và sinh các chunk token;
+    |Máy chủ Ứng dụng (ASP.NET Core .NET 10 Kestrel)|
+    :Truyền luồng token phân hồi về máy chủ Kestrel;
+    :Mở kênh Server-Sent Events (SSE Stream);
+else (Trò chuyện LLM đa mô hình)
+    |Máy chủ Ứng dụng (ASP.NET Core .NET 10 Kestrel)|
+    :PromptService đọc mẫu chỉ thị từ thư mục vật lý Prompts/;
+    :OpenRouterService / OllamaService gọi Gateway API;
+    |Dịch vụ Đám mây bên ngoài (External Cloud)|
+    :Mô hình AI suy luận và sinh các chunk token;
+    |Máy chủ Ứng dụng (ASP.NET Core .NET 10 Kestrel)|
+    :Truyền tiếp luồng Server-Sent Events (SSE);
+endif
+
+|Client Browser (Giao diện & Logic Trình duyệt)|
+while (Còn nhận được chunk token SSE từ máy chủ?) is (Có)
+    :Giải mã gói JSON (data: {...});
+    :Ghép nối ký tự và cập nhật DOM;
+    :Biên dịch cú pháp Markdown và công thức KaTeX;
+endwhile (Hết dòng [DONE])
+
+:Đóng luồng SSE & tắt Typing Indicator;
+:Lưu trữ toàn bộ đoạn chat vào LocalStorage (Client-Only);
+
+if (Người dùng nhấn nút "Nghe đọc" / TTS?) then (Có)
+    :Gửi HTTP GET /Tts/StreamSpeech;
+    |Máy chủ Ứng dụng (ASP.NET Core .NET 10 Kestrel)|
+    :TtsService sinh chữ ký DRM Sec-MS-GEC v2 (SHA-256);
+    |Dịch vụ Đám mây bên ngoài (External Cloud)|
+    :Kết nối WebSocket (WSS) tới Microsoft Bing Speech;
+    :Truyền luồng âm thanh MPEG nhị phân (audio/mpeg);
+    |Máy chủ Ứng dụng (ASP.NET Core .NET 10 Kestrel)|
+    :Đệm âm thanh MemoryStream (kèm 3x Retry Policy);
+    :Truyền luồng audio về trình duyệt;
+    |Client Browser (Giao diện & Logic Trình duyệt)|
+    :AudioPlayer nạp Blob và phát âm thanh tiếng Việt tự nhiên;
+    :Hiển thị nút tải xuống tệp MP3;
+else (Không)
+endif
+
+:Hoàn tất chu trình tương tác và sẵn sàng nhận lệnh mới;
+stop
+
+@enduml

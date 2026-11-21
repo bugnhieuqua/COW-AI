@@ -1,0 +1,105 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam dpi 300
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 11
+
+skinparam component {
+    BackgroundColor #F8FAFC
+    BorderColor #334155
+    ArrowColor #1E293B
+}
+
+skinparam node {
+    BackgroundColor #FFFFFF
+    BorderColor #1E293B
+}
+
+skinparam cloud {
+    BackgroundColor #FAF5FF
+    BorderColor #9333EA
+}
+
+skinparam database {
+    BackgroundColor #F0FDF4
+    BorderColor #16A34A
+}
+
+title SƠ ĐỒ THÀNH PHẦN KIẾN TRÚC HỆ THỐNG COW.AI (UML COMPONENT DIAGRAM)
+
+node "Thiết Bị Người Dùng (Client Browser)" as ClientNode {
+    [UI & Razor Views\n(HTML5, CSS Modular, Three.js)] as UIComp
+    [File Attachment Handler\n(file-attachment.js)] as FileComp
+    [Audio & Voice Controller\n(voice-input.js & Audio Element)] as AudioComp
+    [ChatLogic State Machine\n(chat-logic.js)] as LogicComp
+    database "HTML5 LocalStorage\n(Privacy-by-Design)" as LocalDB
+    
+    UIComp --> LogicComp : UI DOM Events
+    FileComp --> LogicComp : File Text Extracted
+    AudioComp --> LogicComp : Voice Text (STT)
+    LogicComp --> LocalDB : Persist Conversations (No Server DB!)
+}
+
+node "Máy Chủ Ứng Dụng (ASP.NET Core 10.0 Host)" as ServerNode {
+    package "API Controllers Layer" {
+        [HomeController] as HomeCtrl
+        [DocumentController] as DocCtrl
+        [TtsController] as TtsCtrl
+    }
+    
+    package "Core Domain Services" {
+        [IntentDispatcherService] as IntentSvc
+        [PromptService] as PromptSvc
+    }
+    
+    package "Infrastructure & Gateways" {
+        [DuckDuckGoService] as DDGSvc
+        [OpenRouterService] as OpenRouterSvc
+        [OllamaService] as OllamaSvc
+        [TtsService Facade] as TtsFacade
+        [EdgeTtsClient & DRM] as EdgeClient
+    }
+    
+    package "Prompts Repository" {
+        folder "Prompts File Templates" {
+            file "PromptTranslation.txt" as P1
+            file "CodeGeneration.txt" as P2
+            file "DocumentSummary.json" as P3
+            file "AutoRoutingKeywords.json" as P4
+        }
+    }
+    
+    HomeCtrl --> IntentSvc : DispatchIntent()
+    HomeCtrl --> PromptSvc : GetTemplate()
+    HomeCtrl --> DDGSvc : SearchAsync()
+    HomeCtrl --> OpenRouterSvc : StreamChatAsync()
+    HomeCtrl --> OllamaSvc : StreamChatAsync()
+    
+    DocCtrl --> PromptSvc : GetTemplate()
+    DocCtrl --> OpenRouterSvc : StreamChatAsync()
+    
+    TtsCtrl --> TtsFacade : StreamToResponseAsync()
+    TtsFacade --> EdgeClient : StreamAsync() (3x Retry)
+    
+    PromptSvc --> P1 : In-Memory Cache & Hot Reload
+}
+
+cloud "Hạ Tầng Điện Toán Đám Mây Bên Ngoài" as CloudServices {
+    [Microsoft Bing Speech WSS\n(Neural Voices: HoaiMy, NamMinh)] as BingSpeech
+    [Pollinations AI Service\n(Realtime Diffusion Generation)] as Pollinations
+    [DuckDuckGo Search Engine\n(Lite Web Crawling)] as DDGEngine
+    [OpenRouter API Platform\n(Gemini 2.0, DeepSeek R1, Llama 3)] as OpenRouterAPI
+}
+
+LogicComp --> HomeCtrl : HTTP POST /StreamChat\n(SSE Stream :5223)
+LogicComp --> DocCtrl : HTTP POST /SummarizeDoc
+LogicComp --> TtsCtrl : HTTP GET /StreamSpeech\n(Audio Stream)
+
+EdgeClient --> BingSpeech : WSS Secure WebSocket\n(Sec-MS-GEC v2 Signature)
+HomeCtrl --> Pollinations : HTTPS GET Direct Render
+DDGSvc --> DDGEngine : HTTPS POST Form Query
+OpenRouterSvc --> OpenRouterAPI : HTTPS REST / SSE Stream
+
+@enduml
