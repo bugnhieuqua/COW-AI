@@ -10,6 +10,8 @@ public class StudioController : Controller
     private readonly IStudioService _studioService;
     private readonly IVieNeuTtsService _vieNeuTts;
     private readonly IVideoRenderService _videoRender;
+    private readonly VideoDurationEstimator _estimator;
+    private readonly IImageCompressionService _imageCompressor;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<StudioController> _logger;
 
@@ -17,12 +19,16 @@ public class StudioController : Controller
         IStudioService studioService, 
         IVieNeuTtsService vieNeuTts,
         IVideoRenderService videoRender,
+        VideoDurationEstimator estimator,
+        IImageCompressionService imageCompressor,
         IWebHostEnvironment env,
         ILogger<StudioController> logger)
     {
         _studioService = studioService;
         _vieNeuTts = vieNeuTts;
         _videoRender = videoRender;
+        _estimator = estimator;
+        _imageCompressor = imageCompressor;
         _env = env;
         _logger = logger;
     }
@@ -32,10 +38,7 @@ public class StudioController : Controller
         ".png", ".jpg", ".jpeg", ".webp"
     };
 
-    private static readonly HashSet<string> AllowedDocExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".pptx", ".docx", ".pdf", ".txt", ".md"
-    };
+    private static readonly HashSet<string> AllowedDocExtensions = DocumentTextExtractor.AllowedExtensions;
 
     private const long MaxAvatarBytes = 5 * 1024 * 1024;      // 5 MB
     private const long MaxDocumentBytes = 100 * 1024 * 1024;  // 100 MB
@@ -52,18 +55,15 @@ public class StudioController : Controller
 
     private bool IsAdmin => User.IsInRole("Admin");
 
+    private int EffectiveUserId => CurrentUserId ?? 1;
+
     private bool CanAccessProject(Project project)
     {
-        return IsAdmin || (CurrentUserId.HasValue && project.UserId == CurrentUserId.Value);
+        return IsAdmin || project.UserId == null || project.UserId == EffectiveUserId || project.UserId == 1;
     }
 
     private async Task<(IActionResult? Error, Project? Project)> AuthorizeProjectAccessAsync(int projectId)
     {
-        if (User.Identity?.IsAuthenticated != true || !CurrentUserId.HasValue)
-        {
-            return (Unauthorized(new { error = "Vui lòng đăng nhập tài khoản để thực hiện thao tác này." }), null);
-        }
-
         var project = await _studioService.GetProjectAsync(projectId);
         if (project == null)
         {
@@ -80,11 +80,6 @@ public class StudioController : Controller
 
     private async Task<IActionResult?> AuthorizeSceneAccessAsync(int sceneId)
     {
-        if (User.Identity?.IsAuthenticated != true || !CurrentUserId.HasValue)
-        {
-            return Unauthorized(new { error = "Vui lòng đăng nhập tài khoản để chỉnh sửa phân cảnh." });
-        }
-
         var projectId = await _studioService.GetSceneProjectIdAsync(sceneId);
         if (!projectId.HasValue)
         {
@@ -96,12 +91,12 @@ public class StudioController : Controller
     }
 
     [HttpGet("/studio/{id:int?}")]
-    [HttpGet("/studio/editor/{id:int}")]
+    [HttpGet("/studio/editor/{id:int?}")]
     public async Task<IActionResult> Index(int? id, [FromQuery] string? view)
     {
         // Cho phép khách vãng lai dùng thử Studio ở chế độ Xem/Xem trước (Preview Only)
         var isAuthenticated = User.Identity?.IsAuthenticated == true;
-        List<Project> projects;
+        List<Project> projects = new();
         Project? activeProject = null;
 
         if (isAuthenticated && CurrentUserId.HasValue)
@@ -117,44 +112,33 @@ public class StudioController : Controller
                     activeProject = requested;
                 }
             }
-
-            if (activeProject == null && projects.Count > 0)
-            {
-                activeProject = await _studioService.GetProjectAsync(projects[0].Id);
-            }
-
-            // Nếu user đăng nhập chưa có dự án nào, tạo dự án khởi tạo
-            if (activeProject == null)
-            {
-                activeProject = await _studioService.CreateProjectAsync(
-                    userId,
-                    "Bài giảng: Kiến trúc An toàn Phần mềm OWASP 2026",
-                    "Bài giảng số hóa đa cảnh tự động từ tài liệu với VieNeu 48kHz",
-                    "Hải Đăng");
-
-                projects = await _studioService.GetUserProjectsAsync(userId);
-            }
         }
         else
         {
-            // Khách vãng lai: Danh sách dự án rỗng, chỉ xem trước dự án demo #1
-            projects = new List<Project>();
-            activeProject = await _studioService.GetProjectAsync(1);
-
-            if (activeProject == null)
+            if (id.HasValue)
             {
-                activeProject = await _studioService.CreateProjectAsync(
-                    1,
-                    "Bài giảng: Kiến trúc An toàn Phần mềm OWASP 2026",
-                    "Bài giảng số hóa đa cảnh tự động từ tài liệu với VieNeu 48kHz",
-                    "Hải Đăng");
+                activeProject = await _studioService.GetProjectAsync(id.Value);
             }
         }
 
-        var isEditorRoute = Request.Path.Value?.Contains("/editor") == true || (id.HasValue && view != "hub");
-        var activeView = (view == "editor" || isEditorRoute) ? "editor" : "hub";
+        var isEditorRoute = Request.Path.Value?.Contains("/editor") == true;
+        // Nếu vào tuyến /editor mà không chỉ định id, lấy dự án gần nhất nếu có
+        if (isEditorRoute && activeProject == null && projects.Count > 0)
+        {
+            activeProject = await _studioService.GetProjectAsync(projects[0].Id);
+        }
 
-        ViewData["Title"] = activeView == "editor" ? $"{activeProject.Title} - Trình biên tập COW.AI Studio" : "COW.AI Studio - Không gian Sáng tạo Video Bài Giảng AI";
+        // Nếu cố vào editor nhưng không có bất kỳ dự án nào, chuyển hướng về Studio Hub
+        if (isEditorRoute && activeProject == null)
+        {
+            return Redirect("/studio");
+        }
+
+        var activeView = (activeProject != null && (view == "editor" || isEditorRoute)) ? "editor" : "hub";
+
+        ViewData["Title"] = (activeView == "editor" && activeProject != null)
+            ? $"{activeProject.Title} - Trình biên tập COW.AI Studio"
+            : "COW.AI Studio - Không gian Sáng tạo Video Bài Giảng AI";
         ViewData["Projects"] = projects;
         ViewData["IsAuthenticated"] = isAuthenticated;
         ViewData["ActiveView"] = activeView;
@@ -182,22 +166,39 @@ public class StudioController : Controller
             return BadRequest(new { error = "Tiêu đề dự án không được để trống." });
         }
 
-        var project = await _studioService.CreateProjectAsync(CurrentUserId, req.Title, req.Description, req.Voice);
+        var project = await _studioService.CreateProjectAsync(CurrentUserId, req.Title, req.Description, req.Voice, req.AspectRatio, req.IsAspectLocked);
         return Ok(project);
+    }
+
+    [HttpPut("/api/studio/projects/{id:int}/aspect-ratio")]
+    public async Task<IActionResult> UpdateAspectRatio(int id, [FromBody] UpdateAspectRatioRequest? req)
+    {
+        var (authErr, _) = await AuthorizeProjectAccessAsync(id);
+        if (authErr != null) return authErr;
+
+        var normalized = StudioService.NormalizeAspectRatio(req?.AspectRatio);
+        var ok = await _studioService.UpdateProjectAspectRatioAsync(id, normalized);
+        if (!ok) return NotFound(new { error = "Không tìm thấy dự án." });
+        return Ok(new { success = true, aspectRatio = normalized });
     }
 
     [HttpGet("/api/studio/projects/{id:int}")]
     public async Task<IActionResult> GetProject(int id)
     {
-        if (id != 1)
-        {
-            var (authErr, owned) = await AuthorizeProjectAccessAsync(id);
-            if (authErr != null) return authErr;
-            return Ok(owned);
-        }
-        var project = await _studioService.GetProjectAsync(id);
-        if (project == null) return NotFound(new { error = "Không tìm thấy dự án." });
+        var (authErr, project) = await AuthorizeDemoOrOwnedProjectAsync(id);
+        if (authErr != null) return authErr;
         return Ok(project);
+    }
+
+    private async Task<(IActionResult? Error, Project? Project)> AuthorizeDemoOrOwnedProjectAsync(int id)
+    {
+        var project = await _studioService.GetProjectAsync(id);
+        if (project == null) return (NotFound(new { error = "Không tìm thấy dự án." }), null);
+        if (id != 1 && project.UserId != null)
+        {
+            return await AuthorizeProjectAccessAsync(id);
+        }
+        return (null, project);
     }
 
     [HttpPost("/api/studio/projects/{id:int}/script")]
@@ -237,6 +238,30 @@ public class StudioController : Controller
         var (success, error, imageUrl) = await _studioService.GenerateSceneImageAsync(id);
         if (!success) return BadRequest(new { error });
         return Ok(new { success = true, imageUrl });
+    }
+
+    [HttpPost("/api/studio/scenes/{id:int}/upload-image")]
+    [RequestSizeLimit(50 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 50 * 1024 * 1024)]
+    public async Task<IActionResult> UploadSceneImage(int id, IFormFile? file)
+    {
+        try
+        {
+            var authErr = await AuthorizeSceneAccessAsync(id);
+            if (authErr != null) return authErr;
+
+            if (file == null || file.Length == 0) return BadRequest(new { error = "Vui lòng chọn tệp ảnh để tải lên." });
+
+            var (success, error, imageUrl) = await _studioService.UploadSceneImageAsync(id, file);
+            if (!success) return BadRequest(new { error });
+
+            return Ok(new { success = true, imageUrl });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi ngoại lệ khi tải ảnh cho phân cảnh {SceneId}", id);
+            return StatusCode(500, new { error = "Không thể xử lý ảnh tải lên: " + ex.Message });
+        }
     }
 
     [HttpPost("/api/studio/projects/{id:int}/auto-produce")]
@@ -293,11 +318,9 @@ public class StudioController : Controller
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> PreviewComposition(int id)
     {
-        if (id != 1)
-        {
-            var (authErr, _) = await AuthorizeProjectAccessAsync(id);
-            if (authErr != null) return authErr;
-        }
+        var (authErr, _) = await AuthorizeDemoOrOwnedProjectAsync(id);
+        if (authErr != null) return authErr;
+
         var (success, error, html) = await _studioService.GenerateCompositionAsync(id);
         if (!success) return NotFound(error);
         return Content(html, "text/html", System.Text.Encoding.UTF8);
@@ -306,11 +329,9 @@ public class StudioController : Controller
     [HttpGet("/api/studio/projects/{id:int}/composition")]
     public async Task<IActionResult> GetComposition(int id)
     {
-        if (id != 1)
-        {
-            var (authErr, _) = await AuthorizeProjectAccessAsync(id);
-            if (authErr != null) return authErr;
-        }
+        var (authErr, _) = await AuthorizeDemoOrOwnedProjectAsync(id);
+        if (authErr != null) return authErr;
+
         var (success, error, html) = await _studioService.GenerateCompositionAsync(id);
         if (!success) return BadRequest(new { error });
         return Ok(new { success = true, html });
@@ -357,6 +378,38 @@ public class StudioController : Controller
         return Ok(new { success = true });
     }
 
+    [HttpPost("/api/studio/scenes/{id:int}/move")]
+    public async Task<IActionResult> MoveScene(int id, [FromBody] MoveSceneRequest? req)
+    {
+        var authErr = await AuthorizeSceneAccessAsync(id);
+        if (authErr != null) return authErr;
+
+        var dir = req?.Direction ?? "down";
+        var (success, error, scenes) = await _studioService.MoveSceneAsync(id, dir);
+        if (!success) return BadRequest(new { error });
+        return Ok(new { success = true, scenes });
+    }
+
+    [HttpPost("/api/studio/scenes/{id:int}/duplicate")]
+    public async Task<IActionResult> DuplicateScene(int id)
+    {
+        var authErr = await AuthorizeSceneAccessAsync(id);
+        if (authErr != null) return authErr;
+
+        var (success, error, scene, scenes) = await _studioService.DuplicateSceneAsync(id);
+        if (!success) return BadRequest(new { error });
+        return Ok(new { success = true, scene, scenes });
+    }
+
+    [HttpGet("/api/studio/projects/{id:int}/render-progress")]
+    public async Task<IActionResult> GetRenderProgress(int id)
+    {
+        var (authErr, _) = await AuthorizeProjectAccessAsync(id);
+        if (authErr != null) return authErr;
+
+        return Ok(_videoRender.GetRenderProgress(id));
+    }
+
     [HttpGet("/api/studio/voices")]
     public IActionResult GetVoices()
     {
@@ -364,12 +417,34 @@ public class StudioController : Controller
         return Ok(voices);
     }
 
+    [HttpGet("/api/studio/vieneu-status")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult GetVieNeuStatus([FromQuery] bool warmup = false)
+    {
+        if (warmup)
+        {
+            _vieNeuTts.TriggerWarmUp();
+        }
+        return Ok(_vieNeuTts.GetServerStatus());
+    }
+
+    [HttpPut("/api/studio/projects/{id:int}/avatars")]
+    public async Task<IActionResult> UpdateAvatars(int id, [FromBody] UpdateAvatarsRequest? req)
+    {
+        var (authErr, _) = await AuthorizeProjectAccessAsync(id);
+        if (authErr != null) return authErr;
+
+        var saved = await _studioService.UpdateProjectAvatarsAsync(id, req?.AvatarUrls ?? new List<string>());
+        if (saved == null) return NotFound(new { error = "Không tìm thấy dự án." });
+        return Ok(new { success = true, avatarUrls = saved });
+    }
+
     [HttpPost("/api/studio/projects/{id:int}/upload-source")]
     [RequestSizeLimit(104_857_600)]
     [RequestFormLimits(MultipartBodyLengthLimit = 104_857_600)]
     public async Task<IActionResult> UploadSource(int id, [FromForm] IFormFile? file, [FromForm] List<IFormFile>? avatars)
     {
-        var (authErr, _) = await AuthorizeProjectAccessAsync(id);
+        var (authErr, existingProject) = await AuthorizeProjectAccessAsync(id);
         if (authErr != null) return authErr;
 
         string sourceContent = string.Empty;
@@ -386,21 +461,29 @@ public class StudioController : Controller
             var docExt = Path.GetExtension(file.FileName);
             if (string.IsNullOrWhiteSpace(docExt) || !AllowedDocExtensions.Contains(docExt))
             {
-                return BadRequest(new { error = "Chỉ hỗ trợ tài liệu định dạng .pptx, .docx, .pdf, .txt hoặc .md." });
+                return BadRequest(new { error = "Định dạng chưa hỗ trợ. Hãy chọn .pdf, .pptx, .docx, .xlsx, .csv, .html, .epub, .ipynb, .xml, .json, .txt hoặc .md." });
             }
 
             sourceFileName = Path.GetFileName(file.FileName);
             (sourceContent, warning) = await ExtractTextFromUploadedFileAsync(file);
         }
 
-        var avatarUrls = new List<string>();
+        var existingAvatars = StudioService.ParseAvatarsJson(existingProject?.AvatarsJson);
+        int remainingSlots = Math.Max(0, 6 - existingAvatars.Count);
+
+        var newlyUploadedAvatars = new List<string>();
         if (avatars != null && avatars.Count > 0)
         {
+            if (remainingSlots == 0)
+            {
+                return BadRequest(new { error = "Dự án đã đạt tối đa 6 ảnh chân dung. Hãy xóa bớt ảnh cũ trước khi thêm ảnh mới." });
+            }
+
             var avatarDir = Path.Combine(_env.WebRootPath, "media", "studio", "avatars", $"proj_{id}");
             Directory.CreateDirectory(avatarDir);
 
-            int avatarIdx = 1;
-            foreach (var av in avatars.Take(3))
+            int avatarIdx = existingAvatars.Count + 1;
+            foreach (var av in avatars.Take(remainingSlots))
             {
                 if (av.Length == 0) continue;
                 if (av.Length > MaxAvatarBytes)
@@ -414,160 +497,54 @@ public class StudioController : Controller
                     return BadRequest(new { error = "Ảnh giảng viên chỉ chấp nhận định dạng .png, .jpg, .jpeg hoặc .webp." });
                 }
 
-                var avFileName = $"avatar_{avatarIdx++}_{Guid.NewGuid():N}{ext.ToLowerInvariant()}";
+                // Tự động nén ảnh đại diện trước khi lưu để tiết kiệm đĩa
+                await using var avStream = av.OpenReadStream();
+                var (_, compBytes, compExt, _) = await _imageCompressor.CompressImageAsync(avStream, av.FileName, maxDimension: 1024, quality: 85);
+
+                var avFileName = $"avatar_{avatarIdx++}_{Guid.NewGuid():N}{compExt}";
                 var avLocalPath = Path.Combine(avatarDir, avFileName);
-                await using (var stream = new FileStream(avLocalPath, FileMode.Create))
-                {
-                    await av.CopyToAsync(stream);
-                }
-                avatarUrls.Add($"/media/studio/avatars/proj_{id}/{avFileName}");
+                await System.IO.File.WriteAllBytesAsync(avLocalPath, compBytes);
+
+                newlyUploadedAvatars.Add($"/media/studio/avatars/proj_{id}/{avFileName}");
             }
         }
+
+        var savedProject = await _studioService.SaveProjectSourceAsync(
+            id,
+            sourceFileName,
+            sourceContent,
+            newlyUploadedAvatars.Count > 0 ? newlyUploadedAvatars : null);
+
+        var allAvatarUrls = StudioService.ParseAvatarsJson(savedProject?.AvatarsJson);
+        var normalizedMd = savedProject?.SourceMarkdown ?? sourceContent ?? string.Empty;
+        var durationEstimate = _estimator.Estimate(
+            normalizedMd,
+            savedProject?.VideoType,
+            savedProject?.SequentialSubMode,
+            savedProject?.DurationPreset,
+            savedProject?.AspectRatio);
 
         return Ok(new
         {
             success = true,
-            sourceFileName,
-            sourceContent,
+            sourceFileName = savedProject?.SourceFileName ?? sourceFileName,
+            sourceContent = normalizedMd,
+            sourceMarkdown = normalizedMd,
+            durationEstimate,
             warning,
-            avatarUrls
+            avatarUrls = allAvatarUrls,
+            projectTitle = savedProject?.Title,
+            projectStatus = savedProject?.Status,
+            recommendedVideoType = durationEstimate.RecommendedVideoType,
+            recommendedSequentialSubMode = durationEstimate.RecommendedSequentialSubMode,
+            updatedAt = savedProject?.UpdatedAt
         });
     }
 
-    private async Task<(string Content, string? Warning)> ExtractTextFromUploadedFileAsync(IFormFile file)
+    // Ủy quyền trích xuất word/document.xml, .pptx, .pdf, .txt, .md cho DocumentTextExtractor dùng chung
+    private Task<(string Content, string? Warning)> ExtractTextFromUploadedFileAsync(IFormFile file)
     {
-        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        try
-        {
-            if (ext == ".pptx")
-            {
-                using var ms = new MemoryStream();
-                await file.CopyToAsync(ms);
-                ms.Position = 0;
-
-                using var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: false);
-                var slideEntries = zip.Entries
-                    .Where(e => System.Text.RegularExpressions.Regex.IsMatch(
-                        e.FullName, @"^ppt/slides/slide(\d+)\.xml$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-                    .OrderBy(e =>
-                    {
-                        var m = System.Text.RegularExpressions.Regex.Match(e.FullName, @"slide(\d+)\.xml$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                        return m.Success ? int.Parse(m.Groups[1].Value) : 999;
-                    })
-                    .ToList();
-
-                var sb = new System.Text.StringBuilder();
-                int slideNum = 1;
-                foreach (var entry in slideEntries)
-                {
-                    using var entryStream = entry.Open();
-                    using var reader = new StreamReader(entryStream, System.Text.Encoding.UTF8);
-                    var xml = await reader.ReadToEndAsync();
-                    var textMatches = System.Text.RegularExpressions.Regex.Matches(xml, @"<a:t(?:\s+[^>]*)?>([\s\S]*?)<\/a:t>");
-                    if (textMatches.Count > 0)
-                    {
-                        sb.AppendLine($"### Slide {slideNum}:");
-                        foreach (System.Text.RegularExpressions.Match tm in textMatches)
-                        {
-                            var txt = System.Net.WebUtility.HtmlDecode(tm.Groups[1].Value).Trim();
-                            if (!string.IsNullOrEmpty(txt))
-                            {
-                                sb.Append(txt).Append(' ');
-                            }
-                        }
-                        sb.AppendLine().AppendLine();
-                    }
-                    slideNum++;
-                }
-
-                // Trích thêm Ghi chú diễn giả (Speaker Notes) hoặc SmartArt nếu có
-                var extraEntries = zip.Entries
-                    .Where(e => System.Text.RegularExpressions.Regex.IsMatch(
-                        e.FullName, @"^ppt/(notesSlides/notesSlide|diagrams/data)\d+\.xml$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-                    .ToList();
-                foreach (var extra in extraEntries)
-                {
-                    using var es = extra.Open();
-                    using var er = new StreamReader(es, System.Text.Encoding.UTF8);
-                    var xml = await er.ReadToEndAsync();
-                    var matches = System.Text.RegularExpressions.Regex.Matches(xml, @"<a:t(?:\s+[^>]*)?>([\s\S]*?)<\/a:t>");
-                    if (matches.Count == 0) continue;
-                    var noteLine = string.Join(" ", matches.Cast<System.Text.RegularExpressions.Match>()
-                        .Select(m => System.Net.WebUtility.HtmlDecode(m.Groups[1].Value).Trim())
-                        .Where(t => !string.IsNullOrEmpty(t) && !int.TryParse(t, out _)));
-                    if (noteLine.Length > 8) sb.AppendLine(noteLine);
-                }
-
-                var extracted = TrimExtractedText(sb.ToString());
-                if (extracted.Length > 0) return (extracted, null);
-                return (string.Empty, "Tệp PPTX không có văn bản trích xuất được (có thể các slide chỉ chứa hình ảnh). Hãy dán dàn ý ngắn vào ô bên phải.");
-            }
-
-            if (ext == ".docx")
-            {
-                using var ms = new MemoryStream();
-                await file.CopyToAsync(ms);
-                ms.Position = 0;
-
-                using var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: false);
-                var docEntry = zip.GetEntry("word/document.xml");
-                if (docEntry != null)
-                {
-                    using var entryStream = docEntry.Open();
-                    using var reader = new StreamReader(entryStream, System.Text.Encoding.UTF8);
-                    var xml = await reader.ReadToEndAsync();
-                    var paraMatches = System.Text.RegularExpressions.Regex.Matches(xml, @"<w:p\b[\s\S]*?<\/w:p>");
-                    var sb = new System.Text.StringBuilder();
-                    foreach (System.Text.RegularExpressions.Match pm in paraMatches)
-                    {
-                        var textMatches = System.Text.RegularExpressions.Regex.Matches(pm.Value, @"<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>");
-                        if (textMatches.Count == 0) continue;
-                        var line = string.Concat(textMatches.Cast<System.Text.RegularExpressions.Match>()
-                            .Select(m => System.Net.WebUtility.HtmlDecode(m.Groups[1].Value))).Trim();
-                        if (!string.IsNullOrEmpty(line)) sb.AppendLine(line);
-                    }
-                    var extracted = TrimExtractedText(sb.ToString());
-                    if (extracted.Length > 0) return (extracted, null);
-                }
-                return (string.Empty, "Tệp DOCX không có nội dung văn bản đọc được. Hãy nhập trực tiếp dàn ý vào ô bên phải.");
-            }
-
-            if (ext == ".pdf")
-            {
-                using var stream = file.OpenReadStream();
-                using var reader = new StreamReader(stream, System.Text.Encoding.Latin1);
-                var raw = await reader.ReadToEndAsync();
-                var matches = System.Text.RegularExpressions.Regex.Matches(raw, @"\(([^()\\]{2,})\)");
-                var sb = new System.Text.StringBuilder();
-                foreach (System.Text.RegularExpressions.Match m in matches)
-                {
-                    var piece = m.Groups[1].Value.Trim();
-                    if (piece.Length >= 2 && piece.Any(char.IsLetter))
-                    {
-                        sb.AppendLine(piece);
-                    }
-                }
-                var extracted = TrimExtractedText(sb.ToString());
-                if (extracted.Length > 20) return (extracted, null);
-                return (string.Empty, "Tệp PDF này dùng font nén/ảnh scan nên chưa tách chữ trực tiếp được. Hãy copy-paste nội dung hoặc xuất sang DOCX/PPTX/TXT.");
-            }
-
-            // Văn bản thuần (.txt, .md)
-            using var textStream = file.OpenReadStream();
-            using var textReader = new StreamReader(textStream, System.Text.Encoding.UTF8);
-            return (TrimExtractedText(await textReader.ReadToEndAsync()), null);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Không thể trích xuất văn bản từ tệp {FileName}", file.FileName);
-            return (string.Empty, "Không thể đọc cấu trúc tệp này (tệp có thể bị mật khẩu hoặc hỏng). Hãy thử lưu lại hoặc dán nội dung trực tiếp.");
-        }
-    }
-
-    private static string TrimExtractedText(string text)
-    {
-        var clean = (text ?? string.Empty).Trim();
-        return clean.Length > MaxExtractedChars ? clean[..MaxExtractedChars] : clean;
+        return DocumentTextExtractor.ExtractAsync(file, _logger);
     }
 
     [HttpPost("/api/studio/projects/{id:int}/render-backend-video")]
@@ -606,11 +583,44 @@ public class StudioController : Controller
             req?.SourceContent ?? string.Empty,
             req?.VideoType ?? "comparison",
             req?.Voice ?? "Hải Đăng",
-            req?.AvatarUrls ?? new List<string>());
+            req?.AvatarUrls ?? new List<string>(),
+            req?.SequentialSubMode ?? "auto",
+            req?.DurationPreset ?? "auto");
 
         if (!success) return BadRequest(new { error });
         var project = await _studioService.GetProjectAsync(id);
-        return Ok(new { success = true, planMarkdown, project });
+        var durationEstimate = _estimator.Estimate(
+            project?.SourceMarkdown ?? req?.SourceContent,
+            project?.VideoType ?? req?.VideoType,
+            project?.SequentialSubMode ?? req?.SequentialSubMode,
+            project?.DurationPreset ?? req?.DurationPreset,
+            project?.AspectRatio ?? "16:9");
+
+        return Ok(new { success = true, planMarkdown, durationEstimate, project });
+    }
+
+    [HttpGet("/api/studio/projects/{id:int}/export-md")]
+    public async Task<IActionResult> ExportMarkdown(int id, [FromQuery] string? kind = "script")
+    {
+        var (authErr, project) = await AuthorizeProjectAccessAsync(id);
+        if (authErr != null) return authErr;
+        if (project == null) return NotFound(new { error = "Không tìm thấy dự án." });
+
+        bool isSource = string.Equals(kind, "source", StringComparison.OrdinalIgnoreCase);
+        var mdText = isSource
+            ? (project.SourceMarkdown ?? project.SourceContent ?? string.Empty)
+            : (project.PlanMarkdown ?? string.Empty);
+
+        if (string.IsNullOrWhiteSpace(mdText))
+        {
+            return BadRequest(new { error = isSource ? "Dự án chưa có tài liệu Markdown nguồn." : "Dự án chưa có kịch bản Markdown." });
+        }
+
+        var safeSlug = System.Text.RegularExpressions.Regex.Replace(project.Title ?? $"project_{id}", @"[^\p{L}\p{N}_\-]+", "-").Trim('-');
+        if (string.IsNullOrWhiteSpace(safeSlug)) safeSlug = $"project-{id}";
+        var fileName = isSource ? $"{safeSlug}-source.md" : $"{safeSlug}-video-script.md";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(mdText);
+        return File(bytes, "text/markdown; charset=utf-8", fileName);
     }
 
     [HttpPost("/api/studio/projects/{id:int}/apply-plan")]
@@ -645,6 +655,8 @@ public class GeneratePlanRequest
 {
     public string? SourceContent { get; set; }
     public string? VideoType { get; set; } = "comparison";
+    public string? SequentialSubMode { get; set; } = "auto";
+    public string? DurationPreset { get; set; } = "auto";
     public string? Voice { get; set; }
     public List<string>? AvatarUrls { get; set; }
 }
@@ -677,6 +689,7 @@ public class CreateProjectRequest
     public string? Description { get; set; }
     public string? Voice { get; set; }
     public string? AspectRatio { get; set; } = "16:9";
+    public bool IsAspectLocked { get; set; } = false;
 }
 
 public class GenerateScriptRequest
@@ -694,4 +707,19 @@ public class RenderVideoRequest
 public class BulkDeleteProjectsRequest
 {
     public List<int>? ProjectIds { get; set; }
+}
+
+public class MoveSceneRequest
+{
+    public string Direction { get; set; } = "down";
+}
+
+public class UpdateAspectRatioRequest
+{
+    public string AspectRatio { get; set; } = "16:9";
+}
+
+public class UpdateAvatarsRequest
+{
+    public List<string>? AvatarUrls { get; set; }
 }

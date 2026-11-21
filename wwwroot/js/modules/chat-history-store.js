@@ -33,7 +33,12 @@
       const raw = localStorage.getItem(getSessionsKey());
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      // Migration: phiên đã gắn thư mục theo thiết kế cũ được coi là Dự án riêng
+      parsed.forEach(function (s) {
+        if (!s.kind) s.kind = (s.workspace && s.workspace.folderName) ? 'project' : 'chat';
+      });
+      return parsed;
     } catch (e) {
       console.warn('[ChatHistoryStore] Lỗi đọc sessions từ localStorage:', e);
       return [];
@@ -72,9 +77,11 @@
     const sessions = getSessions();
     const newSession = {
       id: generateId(),
+      kind: 'chat',
       title: title || 'Đoạn chat mới',
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      workspace: null,
       messages: []
     };
     sessions.unshift(newSession);
@@ -83,20 +90,75 @@
     return newSession;
   }
 
+  function setSessionWorkspace(sessionId, workspaceObj) {
+    const sessions = getSessions();
+    const targetId = sessionId || getActiveSessionId();
+    const idx = sessions.findIndex(s => s.id === targetId);
+    if (idx === -1) return null;
+    sessions[idx].workspace = workspaceObj || null;
+    sessions[idx].updatedAt = Date.now();
+    saveSessions(sessions);
+    return sessions[idx];
+  }
+
+  function getSessionWorkspace(sessionId) {
+    const targetId = sessionId || getActiveSessionId();
+    if (!targetId) return null;
+    const sess = getSessionById(targetId);
+    return sess ? (sess.workspace || null) : null;
+  }
+
+  function getChatSessions() {
+    return getSessions().filter(function (s) { return s.kind !== 'project'; });
+  }
+
+  function newProjectSessionId() {
+    return 'proj_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+  }
+
+  // Dự án là phiên RIÊNG (kind=project), có lịch sử riêng, không xuất hiện trong "Gần đây"
+  function createProjectSession(id, title, workspaceObj) {
+    const sessions = getSessions();
+    const existing = sessions.find(function (s) { return s.id === id; });
+    if (existing) {
+      existing.kind = 'project';
+      existing.workspace = workspaceObj || existing.workspace || null;
+      existing.title = title || existing.title;
+      existing.updatedAt = Date.now();
+      saveSessions(sessions);
+      setActiveSessionId(id);
+      return existing;
+    }
+    const proj = {
+      id: id,
+      kind: 'project',
+      title: title || 'Dự án',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      workspace: workspaceObj || null,
+      messages: []
+    };
+    sessions.unshift(proj);
+    saveSessions(sessions);
+    setActiveSessionId(id);
+    return proj;
+  }
+
   function getActiveSession() {
     const activeId = getActiveSessionId();
     const sessions = getSessions();
+    const chats = sessions.filter(function (s) { return s.kind !== 'project'; });
     if (!activeId) {
-      if (sessions.length > 0) {
-        setActiveSessionId(sessions[0].id);
-        return sessions[0];
+      if (chats.length > 0) {
+        setActiveSessionId(chats[0].id);
+        return chats[0];
       }
       return null;
     }
     const found = sessions.find(s => s.id === activeId);
-    if (!found && sessions.length > 0) {
-      setActiveSessionId(sessions[0].id);
-      return sessions[0];
+    if (!found && chats.length > 0) {
+      setActiveSessionId(chats[0].id);
+      return chats[0];
     }
     return found || null;
   }
@@ -153,8 +215,9 @@
     saveSessions(sessions);
 
     if (getActiveSessionId() === id) {
-      if (sessions.length > 0) {
-        setActiveSessionId(sessions[0].id);
+      const chatsLeft = sessions.filter(function (s) { return s.kind !== 'project'; });
+      if (chatsLeft.length > 0) {
+        setActiveSessionId(chatsLeft[0].id);
       } else {
         setActiveSessionId(null);
       }
@@ -203,11 +266,16 @@
   // Export module to global window
   global.CowAiHistoryStore = {
     getSessions,
+    getChatSessions,
+    newProjectSessionId,
+    createProjectSession,
     getActiveSessionId,
     setActiveSessionId,
     createSession,
     getActiveSession,
     getSessionById,
+    setSessionWorkspace,
+    getSessionWorkspace,
     addMessage,
     deleteSession,
     clearAllSessions,

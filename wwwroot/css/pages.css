@@ -10,10 +10,10 @@
 
 .chat-app-viewport {
   width: 100%;
-  height: calc(100vh - 4rem);
-  height: calc(100dvh - 4rem);
-  max-height: calc(100vh - 4rem);
-  max-height: calc(100dvh - 4rem);
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -24,8 +24,8 @@
 
 /* 1.1 Initial Centered Mode (Trạng thái khởi tạo) */
 .chat-app-viewport:not(.bottom-mode) {
-  min-height: calc(100vh - 4rem);
-  min-height: calc(100dvh - 4rem);
+  min-height: 100vh;
+  min-height: 100dvh;
   height: auto;
   max-height: none;
   display: flex;
@@ -40,10 +40,10 @@
 
 /* 1.2 Bottom-Docked Mode (Trạng thái hội thoại hoạt động) */
 .chat-app-viewport.bottom-mode {
-  height: calc(100vh - 4rem);
-  height: calc(100dvh - 4rem);
-  max-height: calc(100vh - 4rem);
-  max-height: calc(100dvh - 4rem);
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
   justify-content: flex-start;
   align-items: stretch;
   overflow: hidden;
@@ -61,8 +61,8 @@ body.chat-active {
 
 body.chat-active .main-content {
   overflow: hidden;
-  height: calc(100vh - 4rem);
-  height: calc(100dvh - 4rem);
+  height: 100vh;
+  height: 100dvh;
   padding-bottom: 0;
 }
 
@@ -173,7 +173,9 @@ body.chat-active .main-content {
   min-height: 0;
   opacity: 1;
   width: 100%;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
   transition: opacity 0.4s ease 0.15s;
 }
 
@@ -182,12 +184,10 @@ body.chat-active .main-content {
   width: 100%;
   max-width: 52rem;
   margin: 0 auto;
-  height: 100%;
-  flex: 1 1 auto;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scroll-behavior: smooth;
-  padding: 1.5rem 1rem 1rem;
+  height: auto;
+  flex: 1 0 auto;
+  overflow: visible;
+  padding: 1.5rem 1.25rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -228,12 +228,10 @@ body.chat-active .main-content {
 .bottom-mode .chat-dock-section,
 .bottom-mode #chatDockSection {
   flex: 0 0 auto;
-  padding: 0.75rem 1.5rem 1rem;
-  background: var(--cow-glass-bg);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-top: 1px solid var(--cow-glass-border);
-  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12);
+  padding: 0.5rem 1.5rem 1.15rem;
+  background: transparent;
+  border-top: none;
+  box-shadow: none;
 }
 
 /* 1.6 Suggestions Group & Smooth Collapse Transition */
@@ -430,7 +428,10 @@ body.chat-active .main-content {
 }
 
 .chat-message--ai {
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: flex-start;
+  gap: 0.5rem;
 }
 
 @keyframes fadeInBubble {
@@ -1463,15 +1464,15 @@ body:not(.dark) .code-editor-window pre code .token.class-name {
   .chat-app-viewport,
   .chat-app-viewport.bottom-mode,
   body.chat-active .main-content {
-    height: calc(100vh - 3.75rem);
-    height: calc(100dvh - 3.75rem);
-    max-height: calc(100vh - 3.75rem);
-    max-height: calc(100dvh - 3.75rem);
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
   }
 
   .chat-app-viewport:not(.bottom-mode) {
-    min-height: calc(100dvh - 3.75rem);
-    padding: 1rem 0.85rem 1.75rem;
+    min-height: 100dvh;
+    padding: 3.25rem 0.85rem 1.75rem;
     justify-content: flex-start;
   }
 

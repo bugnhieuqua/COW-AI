@@ -1,0 +1,203 @@
+[
+  {
+    "id": "call_90ef63f3b272",
+    "name": "safe_delete_to_trash",
+    "input": {
+      "paths": [
+        "index.html"
+      ],
+      "reason": "\u0110\u1EC3 t\u1EA1o file code.py m\u1EDBi"
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": "{\u0022success\u0022:true,\u0022sessionId\u0022:\u0022proj_mt_1795162955\u0022,\u0022movedCount\u0022:1,\u0022moved\u0022:[{\u0022id\u0022:\u00223e3ac3b4f4\u0022,\u0022originalPath\u0022:\u0022index.html\u0022,\u0022backupPath\u0022:\u0022.cowai_trash/proj_mt_1795162955/3e3ac3b4f4_index.html\u0022,\u0022sizeBytes\u0022:12}]}",
+    "error": null,
+    "isError": false,
+    "startedAt": 1795162960063,
+    "completedAt": 1795162960151,
+    "durationMs": 88,
+    "createdAt": 1795162960043,
+    "updatedAt": 1795162960152,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795162960043,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795162960063,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795162960151,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795162960152,
+        "note": "final_result"
+      }
+    ]
+  },
+  {
+    "id": "call_6d705b78fdcb",
+    "name": "fs_write",
+    "input": {
+      "path": "code.py",
+      "content": "#!/usr/bin/env python\n\n# \u0110\u00E2y l\u00E0 m\u1ED9t v\u00ED d\u1EE5 \u0111\u01A1n gi\u1EA3n v\u1EC1 m\u1ED9t t\u1EC7p Python\n\nprint(\u0027Xin ch\u00E0o, th\u1EBF gi\u1EDBi!\u0027)"
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": {
+      "path": "code.py",
+      "bytesWritten": 121,
+      "success": true
+    },
+    "error": null,
+    "isError": false,
+    "startedAt": 1795162961546,
+    "completedAt": 1795162961570,
+    "durationMs": 24,
+    "createdAt": 1795162961544,
+    "updatedAt": 1795162961570,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795162961544,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795162961546,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795162961570,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795162961570,
+        "note": "final_result"
+      }
+    ]
+  },
+  {
+    "id": "call_3867a53adc91",
+    "name": "fs_write",
+    "input": {
+      "content": "\u003C!DOCTYPE html\u003E\n\u003Chtml lang=\u0022en\u0022\u003E\n\u003Chead\u003E\n    \u003Cmeta charset=\u0022UTF-8\u0022\u003E\n    \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0\u0022\u003E\n    \u003Ctitle\u003EGi\u1EDBi thi\u1EC7u HTML\u003C/title\u003E\n\u003C/head\u003E\n\u003Cbody\u003E\n    \u003Ch1\u003EXin ch\u00E0o, th\u1EBF gi\u1EDBi!\u003C/h1\u003E\n    \u003Cp\u003EHTML (Hypertext Markup Language) l\u00E0 ng\u00F4n ng\u1EEF \u0111\u00E1nh d\u1EA5u \u0111\u01B0\u1EE3c s\u1EED d\u1EE5ng \u0111\u1EC3 t\u1EA1o c\u1EA5u tr\u00FAc v\u00E0 n\u1ED9i dung c\u1EE7a c\u00E1c trang web.\u003C/p\u003E\n\u003C/body\u003E\n\u003C/html\u003E",
+      "path": "introduction.html"
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": {
+      "path": "introduction.html",
+      "bytesWritten": 404,
+      "success": true
+    },
+    "error": null,
+    "isError": false,
+    "startedAt": 1795162966906,
+    "completedAt": 1795162966907,
+    "durationMs": 1,
+    "createdAt": 1795162966900,
+    "updatedAt": 1795162966908,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795162966900,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795162966906,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795162966907,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795162966908,
+        "note": "final_result"
+      }
+    ]
+  },
+  {
+    "id": "call_45d7717d2f9d",
+    "name": "safe_delete_to_trash",
+    "input": {
+      "paths": [
+        "code.py",
+        "introduction.html"
+      ],
+      "reason": "X\u00F3a t\u1EA5t c\u1EA3 c\u00E1c file trong th\u01B0 m\u1EE5c"
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": "{\u0022success\u0022:true,\u0022sessionId\u0022:\u0022proj_mt_1795162955\u0022,\u0022movedCount\u0022:2,\u0022moved\u0022:[{\u0022id\u0022:\u0022a5c32bc5c4\u0022,\u0022originalPath\u0022:\u0022code.py\u0022,\u0022backupPath\u0022:\u0022.cowai_trash/proj_mt_1795162955/a5c32bc5c4_code.py\u0022,\u0022sizeBytes\u0022:121},{\u0022id\u0022:\u00226c7670ed94\u0022,\u0022originalPath\u0022:\u0022introduction.html\u0022,\u0022backupPath\u0022:\u0022.cowai_trash/proj_mt_1795162955/6c7670ed94_introduction.html\u0022,\u0022sizeBytes\u0022:404}]}",
+    "error": null,
+    "isError": false,
+    "startedAt": 1795162969934,
+    "completedAt": 1795162970135,
+    "durationMs": 201,
+    "createdAt": 1795162969930,
+    "updatedAt": 1795162970135,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795162969930,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795162969934,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795162970135,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795162970135,
+        "note": "final_result"
+      }
+    ]
+  }
+]

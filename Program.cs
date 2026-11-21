@@ -2,6 +2,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using COW_AI.Data;
 using COW_AI.Services;
 
@@ -42,31 +43,57 @@ builder.Services.AddControllersWithViews()
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 
-// Cấu hình Dual-Mode Cơ sở dữ liệu: PostgreSQL (Production/Docker) & SQLite Fallback (Local/Test)
+// Cấu hình 100% PostgreSQL (xóa bỏ hoàn toàn SQLite)
 var pgConnStr = builder.Configuration.GetConnectionString("PostgreSql");
-var usePostgres = !string.IsNullOrWhiteSpace(pgConnStr) && builder.Configuration.GetValue<bool>("Database:UsePostgres", false);
+var csBuilder = new NpgsqlConnectionStringBuilder(
+    string.IsNullOrWhiteSpace(pgConnStr)
+        ? "Host=localhost;Port=5432;Database=cowai_db;Username=postgres;Password=postgres"
+        : pgConnStr);
+
+var envPgPass = builder.Configuration["POSTGRES_PASSWORD"]
+    ?? builder.Configuration["pass postgres"]
+    ?? Environment.GetEnvironmentVariable("POSTGRES_PASSWORD");
+if (!string.IsNullOrWhiteSpace(envPgPass))
+{
+    csBuilder.Password = envPgPass;
+}
+
+var envPgPort = builder.Configuration["POSTGRES_PORT"]
+    ?? builder.Configuration["post"]
+    ?? Environment.GetEnvironmentVariable("POSTGRES_PORT");
+if (int.TryParse(envPgPort, out var parsedPgPort) && parsedPgPort > 0 && parsedPgPort <= 65535)
+{
+    csBuilder.Port = parsedPgPort;
+}
+
+var envPgDb = builder.Configuration["POSTGRES_DB"] ?? Environment.GetEnvironmentVariable("POSTGRES_DB");
+if (!string.IsNullOrWhiteSpace(envPgDb))
+{
+    csBuilder.Database = envPgDb.Trim();
+}
+
+var envPgUser = builder.Configuration["POSTGRES_USER"] ?? Environment.GetEnvironmentVariable("POSTGRES_USER");
+if (!string.IsNullOrWhiteSpace(envPgUser))
+{
+    csBuilder.Username = envPgUser.Trim();
+}
+
+var finalPgConnStr = csBuilder.ConnectionString;
+var targetDbName = string.IsNullOrWhiteSpace(csBuilder.Database) ? "cowai_db" : csBuilder.Database;
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    if (usePostgres)
-    {
-        options.UseNpgsql(pgConnStr);
-    }
-    else
-    {
-        var dataDir = Path.Combine(builder.Environment.ContentRootPath, "Data");
-        if (!Directory.Exists(dataDir)) Directory.CreateDirectory(dataDir);
-        var dbPath = Path.Combine(dataDir, "cowai.db");
-        options.UseSqlite($"Data Source={dbPath}");
-    }
+    options.UseNpgsql(finalPgConnStr);
 });
 
 // Đăng ký dịch vụ xác thực tài khoản, VieNeu TTS, Auto-Video, Studio & Video Rendering Engine
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IVieNeuTtsService, VieNeuTtsService>();
+builder.Services.AddSingleton<IVieNeuTtsService, VieNeuTtsService>();
+builder.Services.AddSingleton<VideoDurationEstimator>();
 builder.Services.AddScoped<IAutoVideoService, AutoVideoService>();
 builder.Services.AddScoped<IStudioService, StudioService>();
 builder.Services.AddScoped<IVideoRenderService, VideoRenderService>();
+builder.Services.AddSingleton<IImageCompressionService, ImageCompressionService>();
 
 // Cấu hình Cookie Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -119,7 +146,12 @@ builder.Services.AddHttpClient("LocalImageHealth", client =>
 builder.Services.AddHttpClient<DuckDuckGoService>();
 builder.Services.AddSingleton<PollinationsService>();
 builder.Services.AddSingleton<LocalImageService>();
+builder.Services.AddSingleton<ImageQuotaService>();
 builder.Services.AddSingleton<IntentDispatcherService>();
+builder.Services.AddSingleton<DirectoryAgentService>();
+builder.Services.AddSingleton<AgentIntentClassifier>();
+builder.Services.AddSingleton<WorkspaceRagService>();
+builder.Services.AddSingleton<KodeWorkspaceAgentService>();
 builder.Services.AddTransient<PromptService>();
 
 // HttpClient cho tầng dịch prompt dự phòng (Pollinations Text API, không cần API key)
@@ -134,73 +166,76 @@ builder.Services.AddScoped<ITtsService, TtsService>();
 
 var app = builder.Build();
 
-// Khởi tạo Database và Admin mặc định nếu chưa có
+// Tự động tạo mới CSDL PostgreSQL (cowai_db), khởi tạo Schema & tài khoản Admin mặc định
+var adminConnBuilder = new NpgsqlConnectionStringBuilder(finalPgConnStr)
+{
+    Database = "postgres"
+};
+await using (var adminConn = new NpgsqlConnection(adminConnBuilder.ConnectionString))
+{
+    await adminConn.OpenAsync();
+    await using var checkDbCmd = adminConn.CreateCommand();
+    checkDbCmd.CommandText = "SELECT 1 FROM pg_database WHERE datname = @dbname;";
+    checkDbCmd.Parameters.AddWithValue("dbname", targetDbName);
+    var dbExists = await checkDbCmd.ExecuteScalarAsync();
+    if (dbExists == null)
+    {
+        var safeDbIdent = "\"" + targetDbName.Replace("\"", "\"\"") + "\"";
+        await using var createDbCmd = adminConn.CreateCommand();
+        createDbCmd.CommandText = $"CREATE DATABASE {safeDbIdent} WITH ENCODING 'UTF8';";
+        await createDbCmd.ExecuteNonQueryAsync();
+    }
+}
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
 
-    // Chỉ chạy vá lược đồ tương thích ngược khi dùng SQLite (PostgreSQL dùng EnsureCreated/Npgsql chuẩn)
-    if (!usePostgres)
-    {
-        db.Database.ExecuteSqlRaw(@"
-            CREATE TABLE IF NOT EXISTS ""Projects"" (
-                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Projects"" PRIMARY KEY AUTOINCREMENT,
-                ""UserId"" INTEGER NULL CONSTRAINT ""FK_Projects_Users_UserId"" REFERENCES ""Users"" (""Id"") ON DELETE CASCADE,
-                ""Title"" TEXT NOT NULL,
-                ""Description"" TEXT NULL,
-                ""Status"" TEXT NOT NULL,
-                ""ScriptJson"" TEXT NULL,
-                ""Voice"" TEXT NOT NULL,
-                ""CreatedAt"" TEXT NOT NULL,
-                ""UpdatedAt"" TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS ""Scenes"" (
-                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Scenes"" PRIMARY KEY AUTOINCREMENT,
-                ""ProjectId"" INTEGER NOT NULL CONSTRAINT ""FK_Scenes_Projects_ProjectId"" REFERENCES ""Projects"" (""Id"") ON DELETE CASCADE,
-                ""OrderIndex"" INTEGER NOT NULL,
-                ""Title"" TEXT NOT NULL,
-                ""Content"" TEXT NOT NULL,
-                ""ImagePrompt"" TEXT NULL,
-                ""ImageUrl"" TEXT NULL,
-                ""AudioUrl"" TEXT NULL,
-                ""DurationSeconds"" REAL NOT NULL,
-                ""AnimationEffect"" TEXT NULL DEFAULT 'ken-burns',
-                ""FilterPreset"" TEXT NULL DEFAULT 'none',
-                ""SubtitlePosition"" TEXT NULL DEFAULT 'bottom'
-            );
-            CREATE INDEX IF NOT EXISTS ""IX_Projects_UserId"" ON ""Projects"" (""UserId"");
-            CREATE INDEX IF NOT EXISTS ""IX_Scenes_ProjectId"" ON ""Scenes"" (""ProjectId"");
-        ");
+    // Đảm bảo đầy đủ cột mở rộng trên PostgreSQL (idempotent)
+    await db.Database.ExecuteSqlRawAsync(@"
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""AnimationEffect"" TEXT DEFAULT 'ken-burns';
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""FilterPreset"" TEXT DEFAULT 'none';
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""SubtitlePosition"" TEXT DEFAULT 'bottom';
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""SceneType"" TEXT DEFAULT 'standard';
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""AvatarPosition"" TEXT DEFAULT 'center';
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""Speaker"" TEXT DEFAULT 'Host';
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""TtsText"" TEXT NULL;
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""VisualKeyword"" TEXT NULL;
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""BeatRole"" TEXT DEFAULT 'step';
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""SectionBadge"" TEXT DEFAULT '';
+        ALTER TABLE ""Scenes"" ADD COLUMN IF NOT EXISTS ""SfxCue"" TEXT DEFAULT 'whoosh';
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""VideoType"" TEXT DEFAULT 'comparison';
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""AvatarsJson"" TEXT NULL;
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""PlanMarkdown"" TEXT NULL;
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""SourceFileName"" TEXT NULL;
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""SourceContent"" TEXT NULL;
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""SourceMarkdown"" TEXT NULL;
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""SequentialSubMode"" TEXT DEFAULT 'auto';
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""DurationPreset"" TEXT DEFAULT 'auto';
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""EstimatedDurationSeconds"" DOUBLE PRECISION DEFAULT 36.0;
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""SkillKey"" TEXT DEFAULT 'compare-3zone';
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""AspectRatio"" TEXT DEFAULT '16:9';
+        ALTER TABLE ""Projects"" ADD COLUMN IF NOT EXISTS ""IsAspectLocked"" BOOLEAN NOT NULL DEFAULT FALSE;
+        CREATE TABLE IF NOT EXISTS ""WorkspaceSessions"" (
+            ""Id"" SERIAL PRIMARY KEY,
+            ""SessionId"" VARCHAR(128) NOT NULL UNIQUE,
+            ""FolderName"" VARCHAR(255) NOT NULL,
+            ""RootPath"" VARCHAR(1024) NOT NULL,
+            ""SourceType"" VARCHAR(32) NOT NULL DEFAULT 'server_path',
+            ""FileCount"" INTEGER NOT NULL DEFAULT 0,
+            ""AgentId"" VARCHAR(160) NOT NULL DEFAULT '',
+            ""AutoApprove"" BOOLEAN NOT NULL DEFAULT FALSE,
+            ""LastIndexedAt"" TIMESTAMPTZ NULL,
+            ""TrashManifestJson"" TEXT NOT NULL DEFAULT '[]',
+            ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            ""UpdatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        ALTER TABLE ""WorkspaceSessions"" ADD COLUMN IF NOT EXISTS ""UserId"" INTEGER NULL;
 
-        var conn = db.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
-
-        async Task EnsureSqliteColumnAsync(string table, string column, string definition)
-        {
-            using var checkCmd = conn.CreateCommand();
-            checkCmd.CommandText = $"SELECT 1 FROM pragma_table_info('{table}') WHERE name = '{column}';";
-            var exists = await checkCmd.ExecuteScalarAsync();
-            if (exists == null)
-            {
-                using var alterCmd = conn.CreateCommand();
-                alterCmd.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {definition};";
-                await alterCmd.ExecuteNonQueryAsync();
-            }
-        }
-
-        await EnsureSqliteColumnAsync("Scenes", "AnimationEffect", "TEXT DEFAULT 'ken-burns'");
-        await EnsureSqliteColumnAsync("Scenes", "FilterPreset", "TEXT DEFAULT 'none'");
-        await EnsureSqliteColumnAsync("Scenes", "SubtitlePosition", "TEXT DEFAULT 'bottom'");
-        await EnsureSqliteColumnAsync("Scenes", "SceneType", "TEXT DEFAULT 'standard'");
-        await EnsureSqliteColumnAsync("Scenes", "AvatarPosition", "TEXT DEFAULT 'center'");
-        await EnsureSqliteColumnAsync("Scenes", "Speaker", "TEXT DEFAULT 'Host'");
-        await EnsureSqliteColumnAsync("Projects", "VideoType", "TEXT DEFAULT 'comparison'");
-        await EnsureSqliteColumnAsync("Projects", "AvatarsJson", "TEXT NULL");
-        await EnsureSqliteColumnAsync("Projects", "PlanMarkdown", "TEXT NULL");
-        await EnsureSqliteColumnAsync("Projects", "SourceFileName", "TEXT NULL");
-        await EnsureSqliteColumnAsync("Projects", "SourceContent", "TEXT NULL");
-    }
+        DELETE FROM ""Scenes"" WHERE ""ProjectId"" IN (SELECT ""Id"" FROM ""Projects"" WHERE ""Title"" ILIKE '%OWASP%' OR ""Title"" ILIKE '%Dev vs%' OR ""Title"" ILIKE '%Dự án mới%' OR ""Title"" ILIKE '%Bài giảng mới%');
+        DELETE FROM ""Projects"" WHERE ""Title"" ILIKE '%OWASP%' OR ""Title"" ILIKE '%Dev vs%' OR ""Title"" ILIKE '%Dự án mới%' OR ""Title"" ILIKE '%Bài giảng mới%' OR (""SourceFileName"" IS NULL AND (SELECT COUNT(*) FROM ""Scenes"" WHERE ""Scenes"".""ProjectId"" = ""Projects"".""Id"") = 0);
+    ");
 
     var auth = scope.ServiceProvider.GetRequiredService<IAuthService>();
     await auth.SeedDefaultAdminAsync();
@@ -220,14 +255,13 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapStaticAssets();
+app.UseStaticFiles();
 
 // Attribute-routed controllers (ví dụ /api/tts/speak, /api/account/status)
 app.MapControllers();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();

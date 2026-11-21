@@ -48,4 +48,17 @@ public class Scene
 
     [MaxLength(50)]
     public string? Speaker { get; set; } = "Host";
+
+    public string? TtsText { get; set; }
+
+    public string? VisualKeyword { get; set; }
+
+    [MaxLength(40)]
+    public string? BeatRole { get; set; } = "step";
+
+    [MaxLength(80)]
+    public string? SectionBadge { get; set; } = "";
+
+    [MaxLength(40)]
+    public string? SfxCue { get; set; } = "whoosh";
 }

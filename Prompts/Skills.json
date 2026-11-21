@@ -1,5 +1,31 @@
 [
   {
+    "command": "/init",
+    "aliases": ["/scan", "/inspect", "/thanhtra"],
+    "name": "Thanh tra & Khởi tạo Dự án",
+    "badge": "Inspector Pro",
+    "badgeType": "code",
+    "category": "featured",
+    "categoryLabel": "Kỹ năng chính",
+    "icon": "code",
+    "description": "Agent tự động quét cấu trúc tệp, phát hiện tech stack và thiết lập mục tiêu làm việc cho dự án hiện tại",
+    "placeholder": "Gõ /init hoặc /init <mục tiêu> để Agent quét toàn bộ dự án...",
+    "example": "/init Phân tích toàn bộ cấu trúc dự án và các tệp manifest cấu hình"
+  },
+  {
+    "command": "/folder",
+    "aliases": ["/dir", "/repo", "/thumuc"],
+    "name": "Đọc & Phân tích Thư mục",
+    "badge": "Repomix + MCP",
+    "badgeType": "code",
+    "category": "featured",
+    "categoryLabel": "Kỹ năng chính",
+    "icon": "folder",
+    "description": "Cho phép AI Agent truy cập và đọc cây thư mục + mã nguồn (tích hợp Repomix & MCP Filesystem)",
+    "placeholder": "Nhập /folder D:\\DuAn <câu hỏi> hoặc nhấn Enter để chọn/tải thư mục lên...",
+    "example": "/folder D:\\COW-AI Hãy giải thích kiến trúc của dự án này"
+  },
+  {
     "command": "/imags",
     "aliases": ["/localimg", "/localimage"],
     "name": "Tạo ảnh Local GPU",

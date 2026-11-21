@@ -7,6 +7,41 @@
   let isGenerating = false;
   let currentAbortController = null;
 
+  function setGeneratingState(generating) {
+    isGenerating = !!generating;
+    const submitBtn = document.getElementById('submitBtn');
+    if (!submitBtn) return;
+
+    if (isGenerating) {
+      submitBtn.classList.add('is-recording');
+      submitBtn.setAttribute('aria-label', 'Dừng tác vụ Agent');
+      submitBtn.title = 'Nhấn để dừng Agent';
+      submitBtn.innerHTML = '<span class="btn-record-dot" aria-hidden="true"></span><span>Dừng</span>';
+      submitBtn.disabled = false;
+    } else {
+      submitBtn.classList.remove('is-recording');
+      submitBtn.setAttribute('aria-label', 'Gửi lệnh');
+      submitBtn.title = 'Gửi lệnh';
+      submitBtn.innerHTML = '<span>Gửi</span><svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7" /></svg>';
+      submitBtn.disabled = false;
+    }
+  }
+
+  function stopChat() {
+    if (currentAbortController) {
+      try {
+        currentAbortController.abort();
+      } catch { }
+      currentAbortController = null;
+    }
+    setGeneratingState(false);
+    const promptInput = document.getElementById('promptInput') || document.getElementById('userPromptInput');
+    if (promptInput) {
+      promptInput.disabled = false;
+      promptInput.focus();
+    }
+  }
+
   /* ==========================================================================
      0. Text-to-Speech via Edge TTS (Mục 21)
      ========================================================================== */
@@ -169,6 +204,26 @@
     return String(bubble.innerText || bubble.textContent || '').trim();
   }
 
+  function showSpeechStatusNotice(msg, isError) {
+    if (!document || !document.body) return;
+    let notice = document.getElementById('cowVieNeuNotice');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'cowVieNeuNotice';
+      notice.className = 'app-toast glass-panel';
+      notice.setAttribute('role', 'status');
+      notice.style.cssText = 'position:fixed;bottom:84px;right:20px;z-index:9999;padding:10px 14px;border-radius:8px;font-size:13px;background:#18181b;color:#f4f4f5;border:1px solid #3f3f46;box-shadow:0 8px 24px rgba(0,0,0,0.45);';
+      document.body.appendChild(notice);
+    }
+    notice.style.borderColor = isError ? '#ef4444' : '#3f3f46';
+    notice.textContent = msg;
+    notice.classList.remove('hidden');
+    clearTimeout(notice._hideTimer);
+    notice._hideTimer = setTimeout(function () {
+      if (notice) notice.classList.add('hidden');
+    }, 5500);
+  }
+
   function speakText(buttonElement, bubbleElement) {
     const bubble = bubbleElement ||
       (buttonElement && typeof buttonElement.closest === 'function'
@@ -220,7 +275,17 @@
       audio.onended = function () {
         if (session === speakSessionId) playChunk(index + 1);
       };
-      audio.onerror = finish;
+      audio.onerror = function () {
+        if (typeof fetch === 'function') {
+          fetch('/api/tts/status')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (st) {
+              if (st && st.message) showSpeechStatusNotice(st.message, st.state === 'error');
+            })
+            .catch(function () {});
+        }
+        finish();
+      };
 
       const playResult = audio.play();
       if (playResult && typeof playResult.catch === 'function') {
@@ -228,7 +293,21 @@
       }
     }
 
-    playChunk(0);
+    if (typeof fetch === 'function') {
+      fetch('/api/tts/status?warmup=true')
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (st) {
+          if (st && !st.isReady) {
+            showSpeechStatusNotice(st.message || '⏳ Server âm thanh VieNeu-TTS 48kHz đang load model, vui lòng đợi...', st.state === 'error');
+          }
+        })
+        .catch(function () {})
+        .finally(function () {
+          if (session === speakSessionId) playChunk(0);
+        });
+    } else {
+      playChunk(0);
+    }
   }
 
   function attachSpeakButton(bubble) {
@@ -279,9 +358,69 @@
       speakText(button, bubble);
     });
 
+    const regenBtn = document.createElement('button');
+    regenBtn.type = 'button';
+    regenBtn.className = 'btn-regenerate-message';
+    regenBtn.title = 'Tạo lại câu trả lời bằng model đang chọn';
+    regenBtn.setAttribute('aria-label', 'Tạo lại câu trả lời');
+    regenBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg><span>Tạo lại</span>';
+
+    regenBtn.addEventListener('click', function (event) {
+      if (event && typeof event.preventDefault === 'function') event.preventDefault();
+      const aiRow = bubble.closest('.chat-message--ai');
+      const promptInput = document.getElementById('promptInput');
+      const form = document.getElementById('chatPromptForm');
+      if (!aiRow || !promptInput || !form) return;
+
+      let prev = aiRow.previousElementSibling;
+      while (prev && !prev.classList.contains('chat-message--user')) {
+        prev = prev.previousElementSibling;
+      }
+      if (!prev) return;
+      const userBubbleEl = prev.querySelector('.chat-bubble-user');
+      const userText = (prev.dataset.promptText || (userBubbleEl ? userBubbleEl.textContent : '') || '').trim();
+      if (!userText) return;
+
+      // Xóa cặp câu hỏi/trả lời hiện tại và gửi lại bằng model hiện đang chọn
+      aiRow.remove();
+      prev.remove();
+      promptInput.value = userText;
+      form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    });
+
     actions.appendChild(copyBtn);
+    actions.appendChild(regenBtn);
     actions.appendChild(button);
     bubble.appendChild(actions);
+  }
+
+  function attachUserEditButton(userRow, rawText) {
+    if (!userRow || userRow.querySelector('.btn-edit-message')) return;
+    userRow.dataset.promptText = rawText || '';
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn-edit-message';
+    editBtn.title = 'Sửa và gửi lại câu hỏi này';
+    editBtn.setAttribute('aria-label', 'Sửa câu hỏi');
+    editBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg><span>Sửa</span>';
+
+    editBtn.addEventListener('click', function () {
+      const promptInput = document.getElementById('promptInput');
+      if (!promptInput) return;
+      promptInput.value = userRow.dataset.promptText || '';
+      promptInput.focus();
+      promptInput.setSelectionRange(promptInput.value.length, promptInput.value.length);
+      // Gỡ lượt này và các tin phía sau để người dùng chỉnh rồi gửi lại gọn gàng
+      let node = userRow;
+      while (node) {
+        const next = node.nextElementSibling;
+        node.remove();
+        node = next;
+      }
+    });
+
+    userRow.appendChild(editBtn);
   }
 
   window.speakText = speakText;
@@ -471,6 +610,8 @@
       imgs.forEach(function (img) {
         if (!img.onload && chatHistory) {
           img.onload = function () {
+            const wrapper = document.getElementById('chatHistoryWrapper');
+            if (wrapper) wrapper.scrollTop = wrapper.scrollHeight;
             chatHistory.scrollTop = chatHistory.scrollHeight;
           };
         }
@@ -732,6 +873,11 @@
   }
 
   async function startChat(customPrompt) {
+    if (isGenerating) {
+      stopChat();
+      return;
+    }
+
     const promptInput = document.getElementById('promptInput') || document.getElementById('userPromptInput');
     const submitBtn = document.getElementById('submitBtn');
     const chatHistory = document.getElementById('chatHistory');
@@ -745,9 +891,20 @@
       ? customPrompt
       : (promptInput ? promptInput.value : '')).trim();
 
-    // Handle File Attachment if present
+    const activeAttachment = window.CowAiFileAttachment ? window.CowAiFileAttachment.getAttachment() : null;
+    const isBareFolderCmd = /^\/(?:folder|dir|repo|thumuc)$/i.test(rawPrompt);
+    if (isBareFolderCmd && !activeAttachment) {
+      if (typeof window.CowAiTriggerDirectFolderPicker === 'function') {
+        window.CowAiTriggerDirectFolderPicker();
+      } else if (typeof window.CowAiOpenFolderModal === 'function') {
+        window.CowAiOpenFolderModal();
+      }
+      return;
+    }
+
+    // Handle File or Folder Attachment if present
     let prompt = rawPrompt;
-    if (window.CowAiFileAttachment && window.CowAiFileAttachment.getAttachment()) {
+    if (activeAttachment) {
       prompt = window.CowAiFileAttachment.formatPromptWithAttachment(rawPrompt);
       window.CowAiFileAttachment.clearAttachment();
     }
@@ -757,10 +914,10 @@
       window.CowAiVoiceInput.stop();
     }
 
-    // Ignore empty or whitespace-only prompts or if streaming is already active
-    if (!prompt || isGenerating) return;
+    // Ignore empty or whitespace-only prompts
+    if (!prompt) return;
 
-    isGenerating = true;
+    setGeneratingState(true);
 
     // Dừng audio TTS đang phát khi bắt đầu lượt chat mới
     stopSpeaking();
@@ -778,17 +935,18 @@
       suggestionsGroup.classList.add('hidden');
     }
 
-    // 2. Clear input, reset height, and disable input + button
+    // 2. Clear input, reset height, and disable input to prevent duplicate spam
     if (promptInput) {
       promptInput.value = '';
       promptInput.style.height = 'auto';
       promptInput.disabled = true;
     }
-    if (submitBtn) {
-      submitBtn.disabled = true;
-    }
 
     function scrollToBottom() {
+      const wrapper = document.getElementById('chatHistoryWrapper');
+      if (wrapper) {
+        wrapper.scrollTop = wrapper.scrollHeight;
+      }
       if (chatHistory) {
         chatHistory.scrollTop = chatHistory.scrollHeight;
       }
@@ -804,6 +962,7 @@
       userBubble.textContent = rawPrompt || prompt;
 
       userMsgRow.appendChild(userBubble);
+      attachUserEditButton(userMsgRow, rawPrompt || prompt);
       chatHistory.appendChild(userMsgRow);
       scrollToBottom();
 
@@ -815,21 +974,37 @@
       }
     }
 
+    // Chỉ phiên Dự án (kind=project) mới được gửi sessionId để Agent thao tác thư mục; đoạn chat thường KHÔNG BAO GIỜ gắn thư mục
+    const activeSessionObj = window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSession() : null;
+    const activeSessionId = (activeSessionObj && activeSessionObj.kind === 'project') ? activeSessionObj.id : '';
+    const autoApproveToggleEl = document.getElementById('workspaceAutoApproveToggle');
+    const autoApproveVal = !!(autoApproveToggleEl && autoApproveToggleEl.checked);
+
     // 4. Append AI Message Bubble to #chatHistory with typing indicator
+    let aiMsgRow = null;
     let aiBubble = null;
     if (chatHistory) {
-      const aiMsgRow = document.createElement('div');
+      aiMsgRow = document.createElement('div');
       aiMsgRow.className = 'message ai chat-message chat-message--ai';
 
       const trimmedCheck = (rawPrompt || prompt || '').trim();
+      const isInitSkillRequest = /^\/(?:init|scan|inspect|thanhtra)(?:\s|:|$)/i.test(trimmedCheck);
       const isLocalImgRequest = (selectedModel || '').toLowerCase() === 'local-image' ||
         /^\/(?:imags|localimg|localimage)(?:\s|:|$)/i.test(trimmedCheck);
       const isCodeSkillRequest = /^\/(?:code|dev|laptrinh)(?:\s|:|$)/i.test(trimmedCheck);
+      const isFolderSkillRequest = /^\/(?:folder|dir|repo|thumuc)(?:\s|:|$)/i.test(trimmedCheck);
       const isSearchSkillRequest = (selectedModel || '').toLowerCase() === 'duckduckgo' ||
         /^\/(?:search|tim|web)(?:\s|:|$)/i.test(trimmedCheck);
+      const activeWs = window.CowAiHistoryStore && activeSessionId
+        ? window.CowAiHistoryStore.getSessionWorkspace(activeSessionId)
+        : null;
 
       let loadingLabel = 'Đang suy nghĩ...';
-      if (isLocalImgRequest) {
+      if (isInitSkillRequest) {
+        loadingLabel = `Agent đang quét & thanh tra dự án "${activeWs ? activeWs.folderName : 'mục tiêu'}"...`;
+      } else if (isFolderSkillRequest || activeWs) {
+        loadingLabel = `AI Agent đang phân tích & xử lý trong "${activeWs ? activeWs.folderName : 'thư mục'}"...`;
+      } else if (isLocalImgRequest) {
         loadingLabel = 'Đang vẽ ảnh với SDXL Turbo...';
       } else if (isCodeSkillRequest) {
         loadingLabel = 'Đang lập trình chuyên sâu (/code)...';
@@ -839,7 +1014,7 @@
 
       aiBubble = document.createElement('div');
       aiBubble.className = 'message-bubble chat-bubble chat-bubble-ai';
-      aiBubble.innerHTML = `<div class="ai-status-loading ai-thinking-indicator"><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span> <span class="ai-status-text">${loadingLabel}</span></div>`;
+      aiBubble.innerHTML = `<div class="ai-status-loading ai-thinking-indicator"><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span> <span class="ai-status-text">${escapeHtml(loadingLabel)}</span></div>`;
 
       aiMsgRow.appendChild(aiBubble);
       chatHistory.appendChild(aiMsgRow);
@@ -880,10 +1055,7 @@
           promptInput.disabled = false;
           promptInput.focus();
         }
-        if (submitBtn) {
-          submitBtn.disabled = false;
-        }
-        isGenerating = false;
+        setGeneratingState(false);
         return;
       }
 
@@ -905,10 +1077,7 @@
         promptInput.disabled = false;
         promptInput.focus();
       }
-      if (submitBtn) {
-        submitBtn.disabled = false;
-      }
-      isGenerating = false;
+      setGeneratingState(false);
       return;
     }
 
@@ -917,6 +1086,105 @@
 
     let accumulatedMarkdown = '';
     let isFirstToken = true;
+    let agentStepsDetails = null;
+    let agentStepsSummary = null;
+    let agentStepsList = null;
+    const completedTools = [];
+    let hasAgentErrors = false;
+
+    function updateAgentStepsSummary() {
+      if (!agentStepsSummary) return;
+      if (completedTools.length > 0) {
+        const uniq = [...new Set(completedTools)];
+        agentStepsSummary.textContent = `⚙ Tiến trình thực thi AI Agent (✓ ${completedTools.length} bước: ${uniq.join(', ')})`;
+      } else if (hasAgentErrors) {
+        agentStepsSummary.textContent = '⚙ Tiến trình thực thi AI Agent (⚠ Lỗi / Chưa chạy thao tác tệp)';
+      } else {
+        agentStepsSummary.textContent = '⚙ Tiến trình thực thi AI Agent';
+      }
+    }
+
+    function ensureAgentStepsBox() {
+      if (agentStepsList || !aiMsgRow) return;
+      agentStepsDetails = document.createElement('details');
+      agentStepsDetails.className = 'agent-steps-box';
+      agentStepsDetails.open = true;
+      agentStepsDetails.innerHTML = '<summary class="agent-steps-box__summary">⚙ Tiến trình thực thi AI Agent</summary><div class="agent-steps-list"></div>';
+      agentStepsSummary = agentStepsDetails.querySelector('.agent-steps-box__summary');
+      agentStepsList = agentStepsDetails.querySelector('.agent-steps-list');
+      if (aiBubble && aiBubble.parentNode === aiMsgRow) {
+        aiMsgRow.insertBefore(agentStepsDetails, aiBubble);
+      } else {
+        aiMsgRow.appendChild(agentStepsDetails);
+      }
+    }
+
+    function appendAgentStep(step) {
+      ensureAgentStepsBox();
+      if (!agentStepsList) return;
+      if (step.phase === 'end' && step.tool && step.state === 'Completed') {
+        completedTools.push(step.tool);
+      } else if (step.phase === 'error') {
+        hasAgentErrors = true;
+      }
+      updateAgentStepsSummary();
+      const item = document.createElement('div');
+      const isErr = step.phase === 'error';
+      item.className = 'agent-step-item' + (isErr ? ' is-error' : '');
+      const badgeLabel = step.phase === 'start' ? 'RUN'
+        : step.phase === 'end' ? 'DONE'
+        : step.phase === 'error' ? 'ERR' : 'INFO';
+      const previewTxt = step.preview ? String(step.preview).slice(0, 140) : '';
+      item.innerHTML = `<span class="agent-step-item__badge">${badgeLabel}</span><span><strong>${escapeHtml(step.tool || 'agent')}</strong>${previewTxt ? ' — ' + escapeHtml(previewTxt) : ''}</span>`;
+      agentStepsList.appendChild(item);
+      scrollToBottom();
+    }
+
+    function renderApprovalCard(req) {
+      if (!aiMsgRow) return;
+      const card = document.createElement('div');
+      card.className = 'agent-approval-card';
+      card.innerHTML = `
+        <div class="agent-approval-card__title">⚠ Cần xác nhận thao tác tool: <code>${escapeHtml(req.tool || '')}</code></div>
+        <pre class="agent-approval-card__preview">${escapeHtml(req.preview || '')}</pre>
+        <div class="agent-approval-card__actions">
+          <button type="button" class="agent-approval-btn agent-approval-btn--approve">✓ Phê duyệt chạy</button>
+          <button type="button" class="agent-approval-btn agent-approval-btn--deny">✕ Từ chối</button>
+        </div>`;
+      const btnOk = card.querySelector('.agent-approval-btn--approve');
+      const btnDeny = card.querySelector('.agent-approval-btn--deny');
+      const actionsEl = card.querySelector('.agent-approval-card__actions');
+
+      async function sendDecision(approved) {
+        if (btnOk) btnOk.disabled = true;
+        if (btnDeny) btnDeny.disabled = true;
+        try {
+          const res = await fetch('/api/agent/workspace/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approvalId: req.approvalId, approved })
+          });
+          const data = await res.json();
+          if (actionsEl) {
+            actionsEl.textContent = approved
+              ? `✅ ${data?.message || 'Đã phê duyệt thực thi.'}`
+              : `🚫 ${data?.message || 'Đã từ chối thao tác.'}`;
+          }
+        } catch {
+          if (actionsEl) actionsEl.textContent = '⚠ Lỗi gửi phản hồi phê duyệt.';
+        }
+      }
+
+      if (btnOk) btnOk.addEventListener('click', () => sendDecision(true));
+      if (btnDeny) btnDeny.addEventListener('click', () => sendDecision(false));
+
+      if (aiBubble && aiBubble.parentNode === aiMsgRow) {
+        aiMsgRow.insertBefore(card, aiBubble);
+      } else {
+        aiMsgRow.appendChild(card);
+      }
+      scrollToBottom();
+    }
 
     function handleSSELine(line) {
       line = line.trim();
@@ -924,11 +1192,42 @@
 
       const payload = line.startsWith('data: ') ? line.slice(6).trim() : line.slice(5).trim();
       if (payload === '[DONE]') {
+        if (agentStepsDetails) {
+          updateAgentStepsSummary();
+          agentStepsDetails.open = hasAgentErrors || completedTools.length === 0;
+          if (window.CowAiWorkspace && activeSessionId) {
+            window.CowAiWorkspace.syncFromServer(activeSessionId);
+            if (typeof window.CowAiWorkspace.syncToLocalDirectoryHandle === 'function') {
+              window.CowAiWorkspace.syncToLocalDirectoryHandle(activeSessionId);
+            }
+          }
+        }
         return true;
       }
 
       try {
         const json = JSON.parse(payload);
+
+        if (json.agent_step) {
+          appendAgentStep(json.agent_step);
+          if (json.agent_step.phase === 'end' && window.CowAiWorkspace && activeSessionId) {
+            window.CowAiWorkspace.syncFromServer(activeSessionId);
+            if (typeof window.CowAiWorkspace.syncToLocalDirectoryHandle === 'function') {
+              window.CowAiWorkspace.syncToLocalDirectoryHandle(activeSessionId);
+            }
+          }
+          return false;
+        }
+
+        if (json.permission_required) {
+          renderApprovalCard(json.permission_required);
+          return false;
+        }
+
+        if (json.trash_updated && window.CowAiWorkspace && activeSessionId) {
+          window.CowAiWorkspace.syncFromServer(activeSessionId);
+          return false;
+        }
 
         if (json.error) {
           const errMsg = typeof json.error === 'string'
@@ -998,7 +1297,7 @@
     try {
       const hiddenTemp = document.getElementById('hiddenTemperature');
       const hiddenTokens = document.getElementById('hiddenMaxTokens');
-      let bodyData = `prompt=${encodeURIComponent(prompt)}&model=${encodeURIComponent(selectedModel || '')}`;
+      let bodyData = `prompt=${encodeURIComponent(prompt)}&model=${encodeURIComponent(selectedModel || '')}&sessionId=${encodeURIComponent(activeSessionId)}&autoApprove=${autoApproveVal ? 'true' : 'false'}`;
       if (hiddenTemp && hiddenTemp.value) bodyData += `&temperature=${encodeURIComponent(hiddenTemp.value)}`;
       if (hiddenTokens && hiddenTokens.value) bodyData += `&maxTokens=${encodeURIComponent(hiddenTokens.value)}`;
 
@@ -1063,6 +1362,14 @@
       }
     } catch (err) {
       if (err.name === 'AbortError') {
+        if (aiBubble) {
+          const stopNotice = document.createElement('div');
+          stopNotice.className = 'ai-stream-stopped';
+          stopNotice.style.cssText = 'margin-top:8px;font-size:12px;color:#f87171;display:flex;align-items:center;gap:6px;font-weight:500;';
+          stopNotice.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:#ef4444;"></span> Đã dừng bởi người dùng';
+          aiBubble.appendChild(stopNotice);
+          scrollToBottom();
+        }
         return;
       }
       if (aiBubble) {
@@ -1071,12 +1378,11 @@
         scrollToBottom();
       }
     } finally {
+      setGeneratingState(false);
+      currentAbortController = null;
       if (promptInput) {
         promptInput.disabled = false;
         promptInput.focus();
-      }
-      if (submitBtn) {
-        submitBtn.disabled = false;
       }
       if (aiBubble && accumulatedMarkdown.trim() && !String(aiBubble.innerHTML || '').includes('ai-alert-error')) {
         renderMarkdown(aiBubble, accumulatedMarkdown, false);
@@ -1088,8 +1394,12 @@
           }
         }
       }
-      isGenerating = false;
-      currentAbortController = null;
+      if (typeof window.refreshHomeImageQuota === 'function') {
+        window.refreshHomeImageQuota();
+      }
+      if (window.CowAiWorkspace && activeSessionId) {
+        window.CowAiWorkspace.syncFromServer(activeSessionId);
+      }
     }
   }
 
@@ -1172,6 +1482,9 @@
       }
     } finally {
       if (submitBtn) submitBtn.disabled = false;
+      if (typeof window.refreshHomeImageQuota === 'function') {
+        window.refreshHomeImageQuota();
+      }
     }
   }
 
@@ -1188,12 +1501,36 @@
     const clearChatBtn = document.getElementById('clearChatBtn');
     const clearImageBtn = document.getElementById('clearImageBtn');
 
-    const DEFAULT_PROMPT_PLACEHOLDER = 'Hỏi bất kỳ điều gì hoặc gõ / để chọn kỹ năng (/imags, /code)...';
+    const DEFAULT_PROMPT_PLACEHOLDER = 'Hỏi bất kỳ điều gì hoặc gõ / để chọn kỹ năng (/folder, /imags, /code)...';
 
     /* ========================================================================
-       1.5. Slash Skills Autocomplete Palette (/imags, /code, /image, /search, /tts)
+       1.5. Slash Skills Autocomplete Palette (/folder, /imags, /code, /image, /search, /tts)
        ======================================================================== */
     const FALLBACK_SKILLS = [
+      {
+        command: '/init',
+        aliases: ['/scan', '/inspect', '/thanhtra'],
+        name: 'Thanh tra & Khởi tạo Dự án',
+        badge: 'Inspector Pro',
+        badgeType: 'code',
+        category: 'featured',
+        categoryLabel: 'Kỹ năng chính',
+        icon: 'code',
+        description: 'Agent tự động quét cấu trúc tệp, phát hiện tech stack và thiết lập mục tiêu làm việc cho dự án hiện tại',
+        placeholder: 'Gõ /init hoặc /init <mục tiêu> để Agent quét toàn bộ dự án...'
+      },
+      {
+        command: '/folder',
+        aliases: ['/dir', '/repo', '/thumuc'],
+        name: 'Đọc & Phân tích Thư mục',
+        badge: 'Repomix + MCP',
+        badgeType: 'code',
+        category: 'featured',
+        categoryLabel: 'Kỹ năng chính',
+        icon: 'folder',
+        description: 'Cho phép AI Agent truy cập và đọc cây thư mục + mã nguồn (tích hợp Repomix & MCP Filesystem)',
+        placeholder: 'Nhập /folder D:\\DuAn <câu hỏi> hoặc nhấn Enter để chọn/tải thư mục lên...'
+      },
       {
         command: '/imags',
         aliases: ['/localimg', '/localimage'],
@@ -1265,6 +1602,8 @@
 
     function getSkillIconSvg(iconType) {
       switch (iconType) {
+        case 'folder':
+          return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>';
         case 'image-gpu':
           return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
         case 'code':
@@ -1344,6 +1683,20 @@
       if (typeof promptInput.setSelectionRange === 'function') {
         const pos = promptInput.value.length;
         promptInput.setSelectionRange(pos, pos);
+      }
+      if (skill.command === '/folder') {
+        if (typeof window.CowAiTriggerDirectFolderPicker === 'function') {
+          window.CowAiTriggerDirectFolderPicker();
+        } else if (typeof window.CowAiOpenFolderModal === 'function') {
+          window.CowAiOpenFolderModal();
+        }
+      } else if (skill.command === '/init') {
+        const curSess = window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSession() : null;
+        if (!curSess || curSess.kind !== 'project') {
+          if (typeof window.CowAiTriggerDirectFolderPicker === 'function') {
+            window.CowAiTriggerDirectFolderPicker();
+          }
+        }
       }
     }
 
@@ -1512,6 +1865,7 @@
 
         if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
+          if (isGenerating) return;
           if (this.value.trim().length > 0) {
             closeSkillsPopover();
             startChat();
@@ -1523,14 +1877,22 @@
     if (promptForm) {
       promptForm.addEventListener('submit', function (e) {
         e.preventDefault();
-        startChat();
+        if (isGenerating) {
+          stopChat();
+        } else {
+          startChat();
+        }
       });
     }
 
     if (submitBtn) {
       submitBtn.addEventListener('click', function (e) {
         e.preventDefault();
-        startChat();
+        if (isGenerating) {
+          stopChat();
+        } else {
+          startChat();
+        }
       });
     }
 
@@ -1590,6 +1952,23 @@
         if (card) card.classList.add('hidden');
       });
     }
+
+    const homeQuotaBadge = document.getElementById('homeImageQuotaBadge');
+    async function refreshHomeImageQuota() {
+      if (!homeQuotaBadge || typeof fetch !== 'function') return null;
+      try {
+        const res = await fetch('/Image/QuotaStatus', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return null;
+        const q = await res.json();
+        homeQuotaBadge.textContent = `Ảnh: ${q.homePageUsed}/${q.homePageLimit} · Tổng ${q.totalUsed}/${q.totalLimit}`;
+        homeQuotaBadge.classList.toggle('is-limit-reached', q.homePageRemaining <= 0 || q.totalRemaining <= 0);
+        return q;
+      } catch {
+        return null;
+      }
+    }
+    window.refreshHomeImageQuota = refreshHomeImageQuota;
+    refreshHomeImageQuota();
   }
 
   /* ==========================================================================
@@ -1793,6 +2172,7 @@
     const btnText = document.getElementById('imageBtnText');
     const engineBadge = document.getElementById('imageEngineBadge');
     const engineBadgeText = document.getElementById('imageEngineBadgeText');
+    const quotaBadge = document.getElementById('imageQuotaBadge');
     const statusTag = document.getElementById('imageStatusTag');
     const previewContainer = document.getElementById('imagePreviewContainer');
     const emptyState = document.getElementById('imageEmptyState');
@@ -1836,7 +2216,36 @@
       }
     }
 
+    function applyImageQuotaUI(q) {
+      if (!q) return;
+      if (quotaBadge) {
+        quotaBadge.textContent = `Đã tạo ${q.imagePageUsed}/${q.imagePageLimit} ảnh · Tổng ${q.totalUsed}/${q.totalLimit}`;
+        quotaBadge.classList.toggle('is-limit-reached', q.imagePageRemaining <= 0 || q.totalRemaining <= 0);
+      }
+      const exhausted = q.imagePageRemaining <= 0 || q.totalRemaining <= 0;
+      if (submitBtn) submitBtn.disabled = exhausted;
+      if (regenerateBtn) regenerateBtn.disabled = exhausted;
+      if (exhausted && btnText) {
+        btnText.textContent = `Đã đạt giới hạn ${q.imagePageLimit}/${q.imagePageLimit} ảnh`;
+      } else if (!exhausted && btnText && btnText.textContent.includes('giới hạn')) {
+        btnText.textContent = 'Tạo ảnh ngay';
+      }
+    }
+
+    async function refreshImageQuota() {
+      try {
+        const res = await fetch('/Image/QuotaStatus', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return null;
+        const q = await res.json();
+        applyImageQuotaUI(q);
+        return q;
+      } catch {
+        return null;
+      }
+    }
+
     refreshLocalStatus();
+    refreshImageQuota();
 
     function setupChips(chips) {
       chips.forEach(function (chip) {
@@ -1904,6 +2313,11 @@
         }
 
         const data = await response.json();
+        if (data && data.quota) {
+          applyImageQuotaUI(data.quota);
+        } else {
+          refreshImageQuota();
+        }
         if (data && data.error) {
           throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || 'Lỗi khi tạo ảnh.'));
         }
@@ -1935,6 +2349,7 @@
         if (btnSpinner) btnSpinner.classList.add('hidden');
         if (btnText) btnText.textContent = 'Tạo ảnh ngay';
         if (engineBadge) setEngineState('online', `${data.engine || 'SDXL Turbo'} · Sẵn sàng`);
+        if (data && data.quota) applyImageQuotaUI(data.quota);
       } catch (err) {
         if (loadingState) loadingState.classList.add('hidden');
         if (successState) successState.classList.add('hidden');
@@ -1947,6 +2362,7 @@
         if (submitBtn) submitBtn.disabled = false;
         if (btnSpinner) btnSpinner.classList.add('hidden');
         if (btnText) btnText.textContent = 'Thử lại';
+        refreshImageQuota();
       }
     }
 
@@ -2002,10 +2418,25 @@
     const copyBtn = document.getElementById('copySummaryBtn');
     const exportBtn = document.getElementById('exportTxtBtn');
     const lengthChips = document.querySelectorAll('#lengthChips .ai-chip');
+    const summaryModelSelect = document.getElementById('summaryModelSelect');
+    const summaryTrainedBadge = document.getElementById('summaryTrainedBadge');
 
     if (!form) {
       return;
     }
+
+    async function refreshTrainedBadgeForDoc(badgeEl) {
+      if (!badgeEl) return;
+      try {
+        const res = await fetch('/Document/TrainedModelStatus', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return;
+        const st = await res.json();
+        badgeEl.textContent = st.hasTrainedModel
+          ? `✓ ${st.trainedModelName} (Đã train)`
+          : (st.online ? 'Ollama sẵn sàng' : 'Cloud Fallback');
+      } catch { }
+    }
+    refreshTrainedBadgeForDoc(summaryTrainedBadge);
 
     if (tabTextBtn && tabFileBtn) {
       tabTextBtn.addEventListener('click', function () {
@@ -2058,14 +2489,15 @@
       });
     }
 
-    function handleFileSelected(file) {
+    async function handleFileSelected(file) {
       if (fileNameDisplay && fileInfo && dropzone) {
         fileNameDisplay.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
         fileInfo.classList.remove('hidden');
         dropzone.classList.add('hidden');
 
-        // Đọc nội dung nếu là file text / md
-        if (file.type.includes('text') || file.name.endsWith('.md') || file.name.endsWith('.txt')) {
+        const lowerName = (file.name || '').toLowerCase();
+        // Tệp văn bản thuần đọc ngay tại trình duyệt
+        if (file.type.includes('text') || lowerName.endsWith('.md') || lowerName.endsWith('.txt')) {
           const reader = new FileReader();
           reader.onload = function (e) {
             if (summaryInput) {
@@ -2074,6 +2506,29 @@
             }
           };
           reader.readAsText(file);
+          return;
+        }
+
+        // Tệp nhị phân (.pptx, .docx, .pdf) trích xuất qua DocumentTextExtractor trên server
+        fileNameDisplay.textContent = 'Đang trích xuất: ' + file.name + '...';
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+          const res = await fetch('/Document/ExtractFile', { method: 'POST', body: formData });
+          const data = await res.json().catch(() => null);
+          if (res.ok && data && data.success) {
+            if (summaryInput && data.content) {
+              summaryInput.value = data.content;
+              if (charCount) charCount.textContent = summaryInput.value.length + ' ký tự';
+              fileNameDisplay.textContent = '✓ ' + (data.fileName || file.name) + ' (' + summaryInput.value.length + ' ký tự)';
+            } else {
+              fileNameDisplay.textContent = data.warning || 'Không tìm thấy văn bản trong tệp';
+            }
+          } else {
+            fileNameDisplay.textContent = 'Lỗi đọc tệp: ' + (data?.error || ('HTTP ' + res.status));
+          }
+        } catch {
+          fileNameDisplay.textContent = 'Lỗi kết nối khi trích xuất tệp';
         }
       }
     }
@@ -2113,12 +2568,13 @@
       }
 
       const activeLength = document.querySelector('#lengthChips .ai-chip.active')?.getAttribute('data-length') || 'bullets';
+      const selectedModel = summaryModelSelect ? summaryModelSelect.value : 'cow-ai-local';
 
       try {
         const response = await fetch('/Document/StreamSummary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `content=${encodeURIComponent(content)}&length=${encodeURIComponent(activeLength)}`
+          body: `content=${encodeURIComponent(content)}&length=${encodeURIComponent(activeLength)}&model=${encodeURIComponent(selectedModel)}`
         });
 
         if (!response.ok) {
@@ -2258,6 +2714,20 @@
       });
     }
 
+    const exportMdBtn = document.getElementById('exportMdBtn');
+    if (exportMdBtn && resultContent) {
+      exportMdBtn.addEventListener('click', function () {
+        const mdBody = '# Kết quả tóm tắt COW.AI\n\n' + resultContent.innerText;
+        const blob = new Blob([mdBody], { type: 'text/markdown;charset=utf-8' });
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = 'COW_AI_TomTat.md';
+        a.click();
+        URL.revokeObjectURL(downloadUrl);
+      });
+    }
+
     if (exportBtn && resultContent) {
       exportBtn.addEventListener('click', function () {
         const blob = new Blob([resultContent.innerText], { type: 'text/plain;charset=utf-8' });
@@ -2290,9 +2760,24 @@
     const explanationText = document.getElementById('codeExplanationText');
     const copyCodeBtn = document.getElementById('copyCodeBtn');
     const standardChips = document.querySelectorAll('#codeStandardChips .ai-chip');
+    const codeModelSelect = document.getElementById('codeModelSelect');
+    const codeTrainedBadge = document.getElementById('codeTrainedBadge');
 
     if (!form) {
       return;
+    }
+
+    if (codeTrainedBadge) {
+      fetch('/Document/TrainedModelStatus', { headers: { 'Accept': 'application/json' } })
+        .then(r => (r.ok ? r.json() : null))
+        .then(st => {
+          if (st) {
+            codeTrainedBadge.textContent = st.hasTrainedModel
+              ? `✓ ${st.trainedModelName} (Đã train)`
+              : (st.online ? 'Ollama sẵn sàng' : 'Cloud Fallback');
+          }
+        })
+        .catch(() => {});
     }
 
     standardChips.forEach(function (chip) {
@@ -2326,6 +2811,7 @@
       }
 
       const selectedLangKey = langSelect ? langSelect.value : 'python';
+      const selectedModel = codeModelSelect ? codeModelSelect.value : 'cow-ai-local';
       const standards = Array.from(document.querySelectorAll('#codeStandardChips .ai-chip.active'))
         .map(c => c.textContent.trim())
         .join(', ');
@@ -2345,7 +2831,7 @@
         const response = await fetch('/Document/StreamCodeGen', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `prompt=${encodeURIComponent(promptValue)}&language=${encodeURIComponent(selectedLangKey)}&standards=${encodeURIComponent(standards)}`
+          body: `prompt=${encodeURIComponent(promptValue)}&language=${encodeURIComponent(selectedLangKey)}&standards=${encodeURIComponent(standards)}&model=${encodeURIComponent(selectedModel)}`
         });
 
         if (!response.ok) {
@@ -2471,6 +2957,22 @@
       }
     });
 
+    const downloadCodeBtn = document.getElementById('downloadCodeBtn');
+    if (downloadCodeBtn && codeOutputBlock) {
+      downloadCodeBtn.addEventListener('click', function () {
+        const text = (codeOutputBlock.textContent || '').trim();
+        if (!text) return;
+        const fileName = (fileNameDisplay && fileNameDisplay.textContent.trim()) || 'solution.txt';
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+
     if (copyCodeBtn && codeOutputBlock) {
       copyCodeBtn.addEventListener('click', function () {
         const text = codeOutputBlock.textContent;
@@ -2486,8 +2988,476 @@
 
 
   /* ==========================================================================
-     1.2 Chat History Drawer & Session Restoration
+     1.2 Chat History Drawer, Session Isolation & Workspace Banner
      ========================================================================== */
+  const CowAiWorkspace = (function () {
+    let cachedServerProjects = [];
+
+    function isUserAuthenticated() {
+      return true;
+    }
+
+    function renderBanner(ws, sessionId) {
+      const banner = document.getElementById('activeWorkspaceBanner');
+      const sbAutoEl = document.getElementById('sidebarAutoApproveToggle');
+      const sbRestoreBtn = document.getElementById('sidebarRestoreTrashBtn');
+      const sbTrashCountEl = document.getElementById('sidebarTrashCount');
+      const sbDownloadBtn = document.getElementById('sidebarDownloadZipBtn');
+
+      if (!ws || !ws.folderName) {
+        if (banner) banner.classList.add('hidden');
+        if (sbRestoreBtn) sbRestoreBtn.classList.add('hidden');
+        if (sbDownloadBtn) sbDownloadBtn.classList.add('hidden');
+        highlightActiveProjectInSidebar(null);
+        return;
+      }
+
+      const nameEl = document.getElementById('workspaceBannerName');
+      const metaEl = document.getElementById('workspaceBannerMeta');
+      const autoEl = document.getElementById('workspaceAutoApproveToggle');
+      const rebindBtn = document.getElementById('workspaceRebindRealBtn');
+      const restoreBtn = document.getElementById('workspaceRestoreTrashBtn');
+      const trashCountEl = document.getElementById('workspaceTrashCount');
+      const downloadBtn = document.getElementById('workspaceDownloadZipBtn');
+      const sid = sessionId || ws.sessionId || (window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : '');
+      const hasLiveHandle = !!(window.CowAiDirectoryHandles && sid && window.CowAiDirectoryHandles[sid]);
+
+      if (nameEl) {
+        nameEl.textContent = ws.folderName;
+        nameEl.title = ws.rootPath || ws.folderName;
+      }
+      if (metaEl) {
+        if (ws.sourceType === 'server_path') {
+          metaEl.textContent = `${ws.rootPath || ws.folderName} · ${ws.fileCount || 0} tệp`;
+        } else if (hasLiveHandle) {
+          metaEl.textContent = `${ws.fileCount || 0} tệp · Đồng bộ 2 chiều`;
+        } else {
+          metaEl.textContent = `${ws.fileCount || 0} tệp · Sẵn sàng`;
+        }
+      }
+      if (rebindBtn) {
+        rebindBtn.classList.toggle('hidden', ws.sourceType === 'server_path');
+        rebindBtn.onclick = function () {
+          if (typeof window.CowAiOpenFolderModal === 'function') {
+            window.CowAiOpenFolderModal(sid);
+          }
+        };
+      }
+      if (autoEl) autoEl.checked = !!ws.autoApprove;
+      if (sbAutoEl) sbAutoEl.checked = !!ws.autoApprove;
+
+      const tCount = Number(ws.trashCount || 0);
+      if (restoreBtn && trashCountEl) {
+        trashCountEl.textContent = String(tCount);
+        restoreBtn.classList.toggle('hidden', tCount <= 0);
+      }
+      if (sbRestoreBtn && sbTrashCountEl) {
+        sbTrashCountEl.textContent = String(tCount);
+        sbRestoreBtn.classList.toggle('hidden', tCount <= 0);
+      }
+
+      const zipHref = sid ? `/api/agent/workspace/download-zip?sessionId=${encodeURIComponent(sid)}` : '#';
+
+      if (downloadBtn) {
+        downloadBtn.href = zipHref;
+        downloadBtn.classList.toggle('hidden', !sid);
+      }
+      if (sbDownloadBtn) {
+        sbDownloadBtn.href = zipHref;
+        sbDownloadBtn.classList.toggle('hidden', !sid);
+      }
+
+      if (banner) banner.classList.remove('hidden');
+      highlightActiveProjectInSidebar(sid);
+    }
+
+    function highlightActiveProjectInSidebar(activeSessionId) {
+      const listEl = document.getElementById('sidebarProjectsList');
+      if (!listEl) return;
+      listEl.querySelectorAll('.cow-sidebar__project-item').forEach(function (el) {
+        el.classList.toggle('active', !!activeSessionId && el.getAttribute('data-session-id') === activeSessionId);
+      });
+    }
+
+    async function refreshProjectsList() {
+      const listEl = document.getElementById('sidebarProjectsList');
+      if (!listEl || !isUserAuthenticated()) return;
+
+      try {
+        const res = await fetch('/api/agent/workspace/list');
+        if (!res.ok) return;
+        const data = await res.json();
+        cachedServerProjects = Array.isArray(data.projects) ? data.projects : [];
+        renderProjectsList(cachedServerProjects);
+      } catch {
+        // Fallback: gom các workspace từ localStorage nếu có
+        const localSessions = window.CowAiHistoryStore ? window.CowAiHistoryStore.getSessions() : [];
+        const localProjs = localSessions
+          .filter(s => s.workspace && s.workspace.folderName)
+          .map(s => Object.assign({}, s.workspace, { sessionId: s.id }));
+        renderProjectsList(localProjs);
+      }
+    }
+
+    function renderProjectsList(projects, filterText) {
+      const listEl = document.getElementById('sidebarProjectsList');
+      if (!listEl) return;
+
+      const q = (filterText || '').trim().toLowerCase();
+      const filtered = (projects || []).filter(p => !q || (p.folderName || '').toLowerCase().includes(q));
+      const activeSid = window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : null;
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="cow-sidebar__empty">Không có dự án</div>';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      filtered.forEach(function (proj) {
+        const row = document.createElement('div');
+        row.className = 'cow-sidebar__project-item' + (proj.sessionId === activeSid ? ' active' : '');
+        row.setAttribute('data-session-id', proj.sessionId);
+        row.setAttribute('tabindex', '0');
+        row.title = `${proj.folderName} (${proj.rootPath || ''})`;
+
+        const main = document.createElement('div');
+        main.className = 'cow-sidebar__project-main';
+        main.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          <span class="cow-sidebar__project-name">${escapeHtml(proj.folderName)}</span>
+        `;
+
+        const badge = document.createElement('span');
+        badge.className = 'cow-sidebar__project-badge';
+        badge.textContent = `${proj.fileCount || 0}f`;
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'cow-sidebar__project-del';
+        delBtn.title = 'Gỡ dự án này';
+        delBtn.setAttribute('aria-label', 'Gỡ dự án ' + proj.folderName);
+        delBtn.textContent = '✕';
+        delBtn.addEventListener('click', async function (e) {
+          e.stopPropagation();
+          await unbindProjectSession(proj.sessionId);
+        });
+
+        row.appendChild(main);
+        row.appendChild(badge);
+        row.appendChild(delBtn);
+
+        row.addEventListener('click', function () {
+          activateProjectSession(proj);
+        });
+
+        listEl.appendChild(row);
+      });
+    }
+
+    function activateProjectSession(proj) {
+      if (!proj || !proj.sessionId) return;
+      if (window.location.pathname !== '/' && window.location.pathname.toLowerCase() !== '/home/index') {
+        localStorage.setItem('cowai_pending_project_session', proj.sessionId);
+        window.location.href = '/';
+        return;
+      }
+
+      if (window.CowAiHistoryStore) {
+        let sess = window.CowAiHistoryStore.getSessionById(proj.sessionId);
+        if (!sess) {
+          const all = window.CowAiHistoryStore.getSessions();
+          sess = {
+            id: proj.sessionId,
+            kind: 'project',
+            title: 'Dự án: ' + proj.folderName,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            workspace: proj,
+            messages: []
+          };
+          all.unshift(sess);
+          try {
+            const uid = (document.body && document.body.dataset && document.body.dataset.userId) || 'guest';
+            const key = uid && uid !== 'guest' ? 'cowai_chat_sessions_u' + uid : 'cowai_chat_sessions';
+            localStorage.setItem(key, JSON.stringify(all));
+          } catch { }
+        } else {
+          window.CowAiHistoryStore.setSessionWorkspace(proj.sessionId, proj);
+        }
+        loadSessionIntoChat(proj.sessionId);
+      }
+      renderBanner(proj, proj.sessionId);
+    }
+
+    async function unbindProjectSession(targetSessionId) {
+      const sid = targetSessionId || (window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : null);
+      if (!sid) return;
+      try {
+        await fetch('/api/agent/workspace/unbind', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid })
+        });
+      } catch { }
+      try {
+        if (localStorage.getItem('cowai_last_active_project_id') === sid) {
+          localStorage.removeItem('cowai_last_active_project_id');
+        }
+      } catch { }
+      if (window.CowAiHistoryStore) {
+        window.CowAiHistoryStore.deleteSession(sid);
+      }
+      const activeSid = window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : null;
+      if (sid === activeSid || !activeSid) {
+        resetChatUI();
+        renderSessionList();
+      }
+      refreshProjectsList();
+    }
+
+    function refreshBanner(sessionId) {
+      const sid = sessionId || (window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : null);
+      if (!sid || !window.CowAiHistoryStore) {
+        renderBanner(null, null);
+        return;
+      }
+      const cachedWs = window.CowAiHistoryStore.getSessionWorkspace(sid);
+      renderBanner(cachedWs, sid);
+      syncFromServer(sid);
+    }
+
+    async function syncFromServer(sessionId) {
+      if (!sessionId) {
+        renderBanner(null, null);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/agent/workspace/status?sessionId=${encodeURIComponent(sessionId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const activeNow = window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : null;
+        if (activeNow && activeNow !== sessionId) return;
+
+        if (data && data.bound && data.workspace) {
+          if (window.CowAiHistoryStore) {
+            window.CowAiHistoryStore.setSessionWorkspace(sessionId, data.workspace);
+          }
+          renderBanner(data.workspace, sessionId);
+          refreshProjectsList();
+        } else {
+          const localWs = window.CowAiHistoryStore ? window.CowAiHistoryStore.getSessionWorkspace(sessionId) : null;
+          if (!localWs) {
+            renderBanner(null, sessionId);
+          }
+        }
+      } catch { /* silent */ }
+    }
+
+    async function handleToggleAuto(checked) {
+      const sid = window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : null;
+      if (!sid) return;
+      const autoEl = document.getElementById('workspaceAutoApproveToggle');
+      const sbAutoEl = document.getElementById('sidebarAutoApproveToggle');
+      if (autoEl) autoEl.checked = checked;
+      if (sbAutoEl) sbAutoEl.checked = checked;
+      try {
+        await fetch('/api/agent/workspace/toggle-auto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid, autoApprove: checked })
+        });
+        const ws = window.CowAiHistoryStore.getSessionWorkspace(sid);
+        if (ws) {
+          ws.autoApprove = checked;
+          window.CowAiHistoryStore.setSessionWorkspace(sid, ws);
+        }
+      } catch { }
+    }
+
+    async function handleRestoreTrash(btnEl) {
+      const sid = window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : null;
+      if (!sid) return;
+      if (btnEl) btnEl.disabled = true;
+      try {
+        const res = await fetch('/api/agent/workspace/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert(`Đã khôi phục ${data.restoredCount} tệp từ .cowai_trash:\n` + (data.restoredPaths || []).join('\n'));
+          syncFromServer(sid);
+          syncToLocalDirectoryHandle(sid);
+        } else {
+          alert(data?.error || 'Không thể khôi phục tệp.');
+        }
+      } catch {
+        alert('Lỗi kết nối khi khôi phục tệp.');
+      } finally {
+        if (btnEl) btnEl.disabled = false;
+      }
+    }
+
+    function init() {
+      const autoEl = document.getElementById('workspaceAutoApproveToggle');
+      const sbAutoEl = document.getElementById('sidebarAutoApproveToggle');
+      const restoreBtn = document.getElementById('workspaceRestoreTrashBtn');
+      const sbRestoreBtn = document.getElementById('sidebarRestoreTrashBtn');
+      const unbindBtn = document.getElementById('workspaceUnbindBtn');
+
+      const collapseBtn = document.getElementById('sidebarProjectsCollapseBtn');
+      const projectsBody = document.getElementById('sidebarProjectsBody');
+      const settingsBtn = document.getElementById('sidebarProjectSettingsBtn');
+      const settingsPanel = document.getElementById('sidebarProjectSettingsPanel');
+      const addProjectBtn = document.getElementById('sidebarAddProjectBtn');
+
+      if (autoEl) autoEl.addEventListener('change', () => handleToggleAuto(!!autoEl.checked));
+      if (sbAutoEl) sbAutoEl.addEventListener('change', () => handleToggleAuto(!!sbAutoEl.checked));
+      if (restoreBtn) restoreBtn.addEventListener('click', () => handleRestoreTrash(restoreBtn));
+      if (sbRestoreBtn) sbRestoreBtn.addEventListener('click', () => handleRestoreTrash(sbRestoreBtn));
+      if (unbindBtn) unbindBtn.addEventListener('click', () => unbindProjectSession());
+
+      if (collapseBtn && projectsBody) {
+        collapseBtn.addEventListener('click', function () {
+          const isExpanded = collapseBtn.getAttribute('aria-expanded') !== 'false';
+          collapseBtn.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+          projectsBody.classList.toggle('hidden', isExpanded);
+        });
+      }
+
+      if (settingsBtn) {
+        settingsBtn.addEventListener('click', function () {
+          if (!isUserAuthenticated()) {
+            window.location.href = '/Account/Login';
+            return;
+          }
+          if (settingsPanel) {
+            settingsPanel.classList.toggle('hidden');
+          }
+        });
+      }
+
+      if (addProjectBtn) {
+        addProjectBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (collapseBtn && projectsBody) {
+            collapseBtn.setAttribute('aria-expanded', 'true');
+            projectsBody.classList.remove('hidden');
+          }
+          if (typeof window.CowAiTriggerDirectFolderPicker === 'function') {
+            window.CowAiTriggerDirectFolderPicker();
+          } else if (typeof window.CowAiOpenFolderModal === 'function') {
+            window.CowAiOpenFolderModal();
+          } else {
+            window.location.href = '/?openFolder=1';
+          }
+        });
+      }
+
+      const pendingSid = localStorage.getItem('cowai_pending_project_session');
+      let targetProjSid = null;
+      if (pendingSid && window.CowAiHistoryStore) {
+        localStorage.removeItem('cowai_pending_project_session');
+        targetProjSid = pendingSid;
+      } else if (window.CowAiHistoryStore) {
+        const curActive = window.CowAiHistoryStore.getActiveSessionId();
+        const cur = curActive ? window.CowAiHistoryStore.getSessionById(curActive) : null;
+        if (cur && cur.kind === 'project') {
+          targetProjSid = cur.id;
+        } else {
+          const lastProjId = localStorage.getItem('cowai_last_active_project_id');
+          if (lastProjId && window.CowAiHistoryStore.getSessionById(lastProjId)) {
+            targetProjSid = lastProjId;
+          }
+        }
+      }
+
+      if (window.location.search.includes('openFolder=1') && typeof window.CowAiOpenFolderModal === 'function') {
+        setTimeout(() => window.CowAiOpenFolderModal(), 150);
+      }
+
+      if (targetProjSid) {
+        openProject(targetProjSid);
+      } else {
+        refreshBanner();
+        refreshProjectsList();
+      }
+    }
+
+    function filterProjects(query) {
+      renderProjectsList(cachedServerProjects, query);
+    }
+
+    async function syncToLocalDirectoryHandle(sessionId) {
+      const sid = sessionId || (window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : null);
+      if (!sid || !window.CowAiDirectoryHandles || !window.CowAiDirectoryHandles[sid]) return;
+      const rootHandle = window.CowAiDirectoryHandles[sid];
+
+      try {
+        const res = await fetch(`/api/agent/workspace/sync-manifest?sessionId=${encodeURIComponent(sid)}`);
+        if (!res.ok) return;
+        const manifest = await res.json();
+        if (!manifest || !manifest.success || manifest.sourceType === 'server_path') return;
+
+        // 1. Xóa các tệp đã chuyển vào .cowai_trash khỏi thư mục thật trên máy
+        for (const delRel of (manifest.deletedPaths || [])) {
+          try {
+            const parts = delRel.split('/').filter(Boolean);
+            let cur = rootHandle;
+            for (let i = 0; i < parts.length - 1; i++) {
+              cur = await cur.getDirectoryHandle(parts[i], { create: false });
+            }
+            if (parts.length > 0) {
+              await cur.removeEntry(parts[parts.length - 1]);
+            }
+          } catch { }
+        }
+
+        // 2. Ghi đồng bộ các tệp mới tạo / chỉnh sửa xuống thư mục thật
+        for (const f of (manifest.files || [])) {
+          try {
+            const rawRes = await fetch(`/api/agent/workspace/read-raw?sessionId=${encodeURIComponent(sid)}&path=${encodeURIComponent(f.path)}`);
+            if (!rawRes.ok) continue;
+            const buf = await rawRes.arrayBuffer();
+            const parts = f.path.split('/').filter(Boolean);
+            let cur = rootHandle;
+            for (let i = 0; i < parts.length - 1; i++) {
+              cur = await cur.getDirectoryHandle(parts[i], { create: true });
+            }
+            if (parts.length > 0) {
+              const fh = await cur.getFileHandle(parts[parts.length - 1], { create: true });
+              const writable = await fh.createWritable();
+              await writable.write(buf);
+              await writable.close();
+            }
+          } catch { }
+        }
+      } catch { }
+    }
+
+    function openProject(sessionId) {
+      if (!sessionId) return;
+      if (window.CowAiHistoryStore) {
+        window.CowAiHistoryStore.setActiveSessionId(sessionId);
+        try {
+          localStorage.setItem('cowai_last_active_project_id', sessionId);
+        } catch { }
+        const ws = window.CowAiHistoryStore.getSessionWorkspace(sessionId);
+        if (ws) {
+          renderBanner(ws, sessionId);
+        }
+      }
+      loadSessionIntoChat(sessionId);
+      refreshBanner(sessionId);
+      refreshProjectsList();
+    }
+
+    return { init, refreshBanner, syncFromServer, syncToLocalDirectoryHandle, refreshProjectsList, filterProjects, openProject };
+  })();
+  window.CowAiWorkspace = CowAiWorkspace;
+
   function resetChatUI() {
     const chatHistory = document.getElementById('chatHistory');
     const viewport = document.getElementById('chatAppViewport') || document.querySelector('.chat-app-viewport');
@@ -2512,6 +3482,10 @@
       suggestionsGroup.classList.remove('collapsed');
       suggestionsGroup.classList.remove('hidden');
     }
+    const activeSid = window.CowAiHistoryStore ? window.CowAiHistoryStore.getActiveSessionId() : null;
+    if (window.CowAiWorkspace) {
+      window.CowAiWorkspace.refreshBanner(activeSid);
+    }
   }
 
   function loadSessionIntoChat(sessionId) {
@@ -2524,6 +3498,15 @@
     const viewport = document.getElementById('chatAppViewport') || document.querySelector('.chat-app-viewport');
     const heroHeader = document.getElementById('chatHeroHeader');
     const suggestionsGroup = document.getElementById('chatSuggestionsGroup');
+    const promptInput = document.getElementById('promptInput');
+
+    if (promptInput) {
+      if (session.workspace && session.workspace.folderName) {
+        promptInput.placeholder = `Hỏi về ${session.workspace.folderName} (${session.workspace.fileCount || 0} tệp)...`;
+      } else {
+        promptInput.placeholder = 'Hỏi bất kỳ điều gì hoặc gõ / để chọn kỹ năng (/folder, /imags, /code)...';
+      }
+    }
 
     if (!chatHistory) return;
 
@@ -2550,6 +3533,7 @@
           userBubble.className = 'message-bubble chat-bubble chat-bubble-user';
           userBubble.textContent = msg.content;
           userMsgRow.appendChild(userBubble);
+          attachUserEditButton(userMsgRow, msg.content);
           chatHistory.appendChild(userMsgRow);
         } else {
           const aiMsgRow = document.createElement('div');
@@ -2562,9 +3546,14 @@
           chatHistory.appendChild(aiMsgRow);
         }
       });
+      const wrapperEl = document.getElementById('chatHistoryWrapper');
+      if (wrapperEl) wrapperEl.scrollTop = wrapperEl.scrollHeight;
       chatHistory.scrollTop = chatHistory.scrollHeight;
     } else {
       resetChatUI();
+    }
+    if (window.CowAiWorkspace) {
+      window.CowAiWorkspace.refreshBanner(sessionId);
     }
     renderSessionList();
   }
@@ -2573,7 +3562,7 @@
     const container = document.getElementById('sessionListContainer');
     if (!container || !window.CowAiHistoryStore) return;
 
-    const sessions = window.CowAiHistoryStore.getSessions();
+    const sessions = window.CowAiHistoryStore.getChatSessions();
     const activeId = window.CowAiHistoryStore.getActiveSessionId();
 
     if (!sessions || sessions.length === 0) {
@@ -2630,20 +3619,46 @@
     const btnNewChat = document.getElementById('btnNewChat');
     const btnExportChat = document.getElementById('btnExportChat');
     const btnClearAll = document.getElementById('btnClearAllChats');
+    const searchToggleBtn = document.getElementById('sidebarSearchToggleBtn');
+    const railSearchBtn = document.getElementById('sidebarRailSearchBtn');
+    const brandExpandBtn = document.getElementById('sidebarBrandExpandBtn');
+    const railExpandBtn = document.getElementById('sidebarRailExpandBtn');
+    const searchWrap = document.getElementById('sidebarSearchWrap');
+    const searchInput = document.getElementById('sidebarSearchInput');
+    const sidebarPromptLibBtn = document.getElementById('sidebarPromptLibBtn');
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+
+    function isDesktopViewport() {
+      return window.innerWidth >= 1024;
+    }
 
     function openDrawer() {
-      if (drawer) {
-        drawer.classList.add('active');
-        drawer.setAttribute('aria-hidden', 'false');
-      }
-      if (backdrop) {
-        backdrop.classList.add('active');
-        backdrop.setAttribute('aria-hidden', 'false');
+      if (isDesktopViewport()) {
+        document.body.classList.remove('sidebar-collapsed');
+        document.body.classList.add('sidebar-docked-open');
+        localStorage.setItem('cowai_sidebar_open', 'true');
+      } else {
+        if (drawer) {
+          drawer.classList.add('active');
+          drawer.setAttribute('aria-hidden', 'false');
+        }
+        if (backdrop) {
+          backdrop.classList.add('active');
+          backdrop.setAttribute('aria-hidden', 'false');
+        }
       }
       renderSessionList();
+      if (window.CowAiWorkspace && typeof window.CowAiWorkspace.refreshProjectsList === 'function') {
+        window.CowAiWorkspace.refreshProjectsList();
+      }
     }
 
     function closeDrawer() {
+      if (isDesktopViewport()) {
+        document.body.classList.remove('sidebar-docked-open');
+        document.body.classList.add('sidebar-collapsed');
+        localStorage.setItem('cowai_sidebar_open', 'false');
+      }
       if (drawer) {
         drawer.classList.remove('active');
         drawer.setAttribute('aria-hidden', 'true');
@@ -2654,17 +3669,127 @@
       }
     }
 
-    if (toggleBtn) toggleBtn.addEventListener('click', openDrawer);
-    if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+    function toggleDrawer() {
+      if (isDesktopViewport()) {
+        if (document.body.classList.contains('sidebar-collapsed')) {
+          openDrawer();
+        } else {
+          closeDrawer();
+        }
+      } else {
+        if (drawer && drawer.classList.contains('active')) {
+          closeDrawer();
+        } else {
+          openDrawer();
+        }
+      }
+    }
+
+    if (toggleBtn) toggleBtn.addEventListener('click', toggleDrawer);
+    if (closeBtn) closeBtn.addEventListener('click', toggleDrawer);
+    if (railExpandBtn) railExpandBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openDrawer();
+    });
     if (backdrop) backdrop.addEventListener('click', closeDrawer);
+
+    document.addEventListener('keydown', function (e) {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's')) {
+        e.preventDefault();
+        toggleDrawer();
+      }
+    });
+
+    if (brandExpandBtn) {
+      brandExpandBtn.addEventListener('click', function (e) {
+        if (isDesktopViewport() && document.body.classList.contains('sidebar-collapsed')) {
+          e.preventDefault();
+          openDrawer();
+        }
+      });
+    }
+
+    if (railSearchBtn) {
+      railSearchBtn.addEventListener('click', function () {
+        openDrawer();
+        if (searchWrap) searchWrap.classList.remove('hidden');
+        if (searchInput) setTimeout(() => searchInput.focus(), 60);
+      });
+    }
+
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', function () {
+        const root = document.documentElement;
+        const nextIsLight = !root.classList.contains('light');
+        root.classList.toggle('light', nextIsLight);
+        root.classList.toggle('dark', !nextIsLight);
+        document.body.classList.toggle('light', nextIsLight);
+        document.body.classList.toggle('dark', !nextIsLight);
+        localStorage.setItem('cowai_theme', nextIsLight ? 'light' : 'dark');
+      });
+    }
+
+    if (searchToggleBtn && searchWrap) {
+      searchToggleBtn.addEventListener('click', function () {
+        const willOpen = searchWrap.classList.contains('hidden');
+        searchWrap.classList.toggle('hidden', !willOpen);
+        if (willOpen && searchInput) {
+          searchInput.focus();
+        } else if (searchInput) {
+          searchInput.value = '';
+          searchInput.dispatchEvent(new Event('input'));
+        }
+      });
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        const q = (searchInput.value || '').trim().toLowerCase();
+        const container = document.getElementById('sessionListContainer');
+        if (container) {
+          container.querySelectorAll('.drawer-session-item').forEach(function (el) {
+            const txt = (el.textContent || '').toLowerCase();
+            el.style.display = (!q || txt.includes(q)) ? '' : 'none';
+          });
+        }
+        if (window.CowAiWorkspace && typeof window.CowAiWorkspace.filterProjects === 'function') {
+          window.CowAiWorkspace.filterProjects(q);
+        }
+      });
+    }
+
+    if (sidebarPromptLibBtn) {
+      sidebarPromptLibBtn.addEventListener('click', function () {
+        const promptLibBtn = document.getElementById('promptLibraryBtn');
+        if (promptLibBtn) {
+          promptLibBtn.click();
+          if (!isDesktopViewport()) closeDrawer();
+        } else {
+          window.location.href = '/';
+        }
+      });
+    }
 
     if (btnNewChat) {
       btnNewChat.addEventListener('click', function () {
+        if (window.location.pathname !== '/' && window.location.pathname.toLowerCase() !== '/home/index') {
+          if (window.CowAiHistoryStore) window.CowAiHistoryStore.createSession();
+          window.location.href = '/';
+          return;
+        }
         if (window.CowAiHistoryStore) {
           window.CowAiHistoryStore.createSession();
+          try {
+            localStorage.removeItem('cowai_last_active_project_id');
+          } catch { }
         }
         resetChatUI();
-        closeDrawer();
+        renderSessionList();
+        if (window.CowAiWorkspace) {
+          window.CowAiWorkspace.refreshProjectsList();
+        }
+        if (!isDesktopViewport()) closeDrawer();
       });
     }
 
@@ -2687,13 +3812,125 @@
         }
       });
     }
+
+    renderSessionList();
   }
 
   /* ==========================================================================
      Global Initialization
      ========================================================================== */
+  function initPromptLibrary() {
+    const btn = document.getElementById('promptLibraryBtn');
+    const popover = document.getElementById('promptLibraryPopover');
+    const listEl = document.getElementById('promptLibraryList');
+    const saveBtn = document.getElementById('btnSavePromptTemplate');
+    const promptInput = document.getElementById('promptInput');
+    if (!btn || !popover || !listEl) return;
+
+    const STORAGE_KEY = 'cowai_prompt_library';
+    const DEFAULTS = [
+      { id: 'tpl-review', title: 'Review code & tìm lỗi bảo mật', text: 'Hãy review đoạn code sau theo 3 mục: (1) Lỗi logic/biên, (2) Rủi ro bảo mật OWASP, (3) Đề xuất rút gọn code tối giản nhất:\n\n' },
+      { id: 'tpl-summary', title: 'Tóm tắt tài liệu 5 ý chính', text: 'Tóm tắt tài liệu dưới đây thành tối đa 5 gạch đầu dòng súc tích, kèm 3 hành động cần làm ngay:\n\n' },
+      { id: 'tpl-test', title: 'Viết Unit Test phủ biên & lỗi', text: 'Viết bộ unit test gọn nhẹ (trường hợp bình thường, giá trị biên và trường hợp lỗi) cho hàm sau:\n\n' }
+    ];
+
+    function loadTemplates() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return DEFAULTS.slice();
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULTS.slice();
+      } catch {
+        return DEFAULTS.slice();
+      }
+    }
+
+    function saveTemplates(items) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch {}
+    }
+
+    function setOpen(open) {
+      popover.classList.toggle('hidden', !open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) renderList();
+    }
+
+    function renderList() {
+      const items = loadTemplates();
+      listEl.innerHTML = '';
+      items.forEach(function (item) {
+        const row = document.createElement('div');
+        row.className = 'prompt-library-item';
+
+        const pick = document.createElement('button');
+        pick.type = 'button';
+        pick.className = 'prompt-library-item__pick';
+        pick.innerHTML = `<span class="prompt-library-item__title">${escapeHtml(item.title)}</span><span class="prompt-library-item__preview">${escapeHtml(item.text.slice(0, 72))}</span>`;
+        pick.addEventListener('click', function () {
+          if (promptInput) {
+            promptInput.value = item.text;
+            promptInput.focus();
+            promptInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          setOpen(false);
+        });
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'prompt-library-item__del';
+        del.title = 'Xóa mẫu này';
+        del.setAttribute('aria-label', 'Xóa mẫu ' + item.title);
+        del.textContent = '✕';
+        del.addEventListener('click', function (e) {
+          e.stopPropagation();
+          saveTemplates(loadTemplates().filter(t => t.id !== item.id));
+          renderList();
+        });
+
+        row.appendChild(pick);
+        row.appendChild(del);
+        listEl.appendChild(row);
+      });
+    }
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      setOpen(popover.classList.contains('hidden'));
+    });
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const text = (promptInput ? promptInput.value : '').trim();
+        if (!text) {
+          if (promptInput) promptInput.focus();
+          return;
+        }
+        const title = text.split('\n')[0].slice(0, 42);
+        const items = loadTemplates();
+        items.unshift({ id: 'tpl-' + Date.now(), title, text });
+        saveTemplates(items.slice(0, 20));
+        renderList();
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      if (!popover.classList.contains('hidden') && !popover.contains(e.target) && !btn.contains(e.target)) {
+        setOpen(false);
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !popover.classList.contains('hidden')) {
+        setOpen(false);
+        btn.focus();
+      }
+    });
+  }
+
   function initializeAllComponents() {
     initPromptBar();
+    initPromptLibrary();
     initModelSelector();
     initImageGen();
     initDocSummary();
@@ -2704,6 +3941,9 @@
     }
     if (window.CowAiFileAttachment && typeof window.CowAiFileAttachment.init === 'function') {
       window.CowAiFileAttachment.init();
+    }
+    if (window.CowAiWorkspace && typeof window.CowAiWorkspace.init === 'function') {
+      window.CowAiWorkspace.init();
     }
   }
 

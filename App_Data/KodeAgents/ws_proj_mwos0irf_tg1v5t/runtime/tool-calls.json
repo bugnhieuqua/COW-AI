@@ -1,0 +1,60 @@
+[
+  {
+    "id": "call_4j9xwdz7",
+    "name": "fs_list",
+    "input": {
+      "path": ".",
+      "includeHidden": false
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": {
+      "path": ".",
+      "count": 1,
+      "entries": [
+        {
+          "name": "index.html",
+          "type": "file",
+          "size": 927,
+          "modified": "2026-11-20T08:27:06.5693335Z"
+        }
+      ]
+    },
+    "error": null,
+    "isError": false,
+    "startedAt": 1795166931220,
+    "completedAt": 1795166931233,
+    "durationMs": 13,
+    "createdAt": 1795166931168,
+    "updatedAt": 1795166931237,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795166931168,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795166931220,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795166931233,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795166931237,
+        "note": "final_result"
+      }
+    ]
+  }
+]

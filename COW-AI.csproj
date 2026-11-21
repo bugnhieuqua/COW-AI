@@ -12,9 +12,14 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+    <PackageReference Include="Kode.Agent.Mcp" Version="0.1.3" />
+    <PackageReference Include="Kode.Agent.Sdk" Version="0.1.3" />
+    <PackageReference Include="Kode.Agent.Store.Json" Version="0.1.3" />
+    <PackageReference Include="Kode.Agent.Tools.Builtin" Version="0.1.3" />
+    <PackageReference Include="ManagedCode.MarkItDown" Version="10.0.8" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <PackageReference Include="SkiaSharp" Version="4.157.0" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="11.0.0" />
   </ItemGroup>
 
 </Project>

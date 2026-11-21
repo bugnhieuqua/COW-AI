@@ -1,14 +1,19 @@
-@model COW_AI.Models.Project
+@model COW_AI.Models.Project?
 @{
     Layout = "_StudioLayout";
     var activeProject = Model;
     var projects = ViewData["Projects"] as List<COW_AI.Models.Project> ?? new List<COW_AI.Models.Project>();
     var isAuthenticated = (bool)(ViewData["IsAuthenticated"] ?? false);
     var activeView = (string)(ViewData["ActiveView"] ?? "hub");
-    var hasScenes = activeProject.Scenes.Count > 0;
-    var totalSeconds = hasScenes ? activeProject.Scenes.Sum(s => s.DurationSeconds > 0 ? s.DurationSeconds : 5) : 0;
+    var hasScenes = activeProject?.Scenes != null && activeProject.Scenes.Count > 0;
+    var totalSeconds = hasScenes ? activeProject!.Scenes.Sum(s => s.DurationSeconds > 0 ? s.DurationSeconds : 5) : 0;
     var totalTimeText = TimeSpan.FromSeconds(totalSeconds).ToString(@"mm\:ss");
-    ViewData["Title"] = activeView == "editor" ? $"{activeProject.Title} - COW.AI Studio" : "COW.AI Studio - Không gian Sáng tạo Video Bài Giảng AI";
+    var activeAspect = string.IsNullOrWhiteSpace(activeProject?.AspectRatio) ? "16:9" : activeProject.AspectRatio.Trim();
+    var isAspectLocked = activeProject?.IsAspectLocked ?? false;
+    var aspectClass = activeAspect == "9:16" ? "aspect-9-16" : (activeAspect == "1:1" ? "aspect-1-1" : "aspect-16-9");
+    var initCanvasW = activeAspect == "9:16" ? 360 : (activeAspect == "1:1" ? 480 : 640);
+    var initCanvasH = activeAspect == "9:16" ? 640 : (activeAspect == "1:1" ? 480 : 360);
+    ViewData["Title"] = (activeView == "editor" && activeProject != null) ? $"{activeProject.Title} - COW.AI Studio" : "COW.AI Studio - Không gian Sáng tạo Video Bài Giảng AI";
 }
 
 @section Head {
@@ -16,7 +21,7 @@
     <meta name="robots" content="noindex, nofollow" />
 }
 
-<div id="studioContainer" class="studio-root-container view-mode-@activeView" data-project-id="@activeProject.Id" data-authenticated="@(isAuthenticated ? "true" : "false")" data-active-view="@activeView" data-active-project-id="@activeProject.Id">
+<div id="studioContainer" class="studio-root-container view-mode-@activeView" data-project-id="@(activeProject?.Id.ToString() ?? "")" data-authenticated="@(isAuthenticated ? "true" : "false")" data-active-view="@activeView" data-active-project-id="@(activeProject?.Id.ToString() ?? "")" data-aspect-ratio="@activeAspect" data-aspect-locked="@(isAspectLocked ? "true" : "false")" data-avatars="@(activeProject?.AvatarsJson ?? "[]")">
 
     <!-- =========================================================================
          1. IN-PAGE AUTH MODAL WITH MONOCHROME CLOSE BUTTON [X]
@@ -126,16 +131,16 @@
                     <!-- Cột 1: Video -->
                     <div class="popover-column">
                         <div class="popover-column__title">Video</div>
-                        <button type="button" class="popover-option" onclick="handleCreateOption('blank', '16:9')">
+                        <button type="button" class="popover-option" onclick="openLatestOrNewEditor()">
                             <div class="popover-option__icon">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"></rect></svg>
                             </div>
                             <div class="popover-option__info">
                                 <div class="popover-option__label">Bảng vẽ trống</div>
-                                <div class="popover-option__desc">Tự do sáng tạo từng phân cảnh</div>
+                                <div class="popover-option__desc">Mở trình biên tập Studio bài giảng</div>
                             </div>
                         </button>
-                        <button type="button" class="popover-option" onclick="handleCreateOption('aspect', '16:9')">
+                        <button type="button" class="popover-option" onclick="openPlanModalWithAspect('16:9')">
                             <div class="popover-option__icon">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect></svg>
                             </div>
@@ -144,7 +149,7 @@
                                 <div class="popover-option__desc">YouTube, Bài giảng máy chiếu</div>
                             </div>
                         </button>
-                        <button type="button" class="popover-option" onclick="handleCreateOption('aspect', '9:16')">
+                        <button type="button" class="popover-option" onclick="openPlanModalWithAspect('9:16')">
                             <div class="popover-option__icon">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"></rect></svg>
                             </div>
@@ -153,7 +158,7 @@
                                 <div class="popover-option__desc">TikTok, Shorts bài giảng ngắn</div>
                             </div>
                         </button>
-                        <button type="button" class="popover-option" onclick="handleCreateOption('aspect', '1:1')">
+                        <button type="button" class="popover-option" onclick="openPlanModalWithAspect('1:1')">
                             <div class="popover-option__icon">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
                             </div>
@@ -358,7 +363,7 @@
                 <section class="hub-features-section">
                     <h2 class="hub-section-title">Tính năng phổ biến</h2>
                     <div class="hub-features-grid">
-                        <div class="hub-feature-card" onclick="handleCreateOption('blank', '16:9')">
+                        <div class="hub-feature-card" onclick="openLatestOrNewEditor()">
                             <div class="hub-feature-card__icon">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                             </div>
@@ -379,7 +384,7 @@
                             <div class="hub-feature-card__title">Studio giọng nói VieNeu</div>
                         </div>
 
-                        <div class="hub-feature-card" onclick="handleCreateOption('aspect', '9:16')">
+                        <div class="hub-feature-card" onclick="openPlanModalWithAspect('9:16')">
                             <div class="hub-feature-card__icon">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"></rect><line x1="9" y1="18" x2="15" y2="18"></line></svg>
                             </div>
@@ -412,7 +417,7 @@
                         {
                             @foreach (var p in projects)
                             {
-                                <div class="hub-project-card" data-project-id="@p.Id" data-title="@p.Title.ToLower()">
+                                <div class="hub-project-card" data-project-id="@p.Id" data-title="@($"{p.Title} {p.SourceFileName}".ToLower())">
                                     <div class="hub-project-card__thumb" onclick="openProjectInEditor(@p.Id)">
                                         <label class="project-checkbox-label" onclick="event.stopPropagation()">
                                             <input type="checkbox" class="project-card-checkbox" data-project-id="@p.Id" onchange="updateSelectedProjectsState()" />
@@ -426,7 +431,11 @@
                                     <div class="hub-project-card__body">
                                         <div class="hub-project-card__title" onclick="openProjectInEditor(@p.Id)" title="@p.Title">@p.Title</div>
                                         <div class="hub-project-card__meta">
-                                            <span>Giọng: @p.Voice</span> · <span>@p.UpdatedAt.ToString("dd/MM/yyyy")</span>
+                                            @if (!string.IsNullOrWhiteSpace(p.SourceFileName))
+                                            {
+                                                <span title="Tệp nguồn đã lưu trong CSDL">Tệp: @p.SourceFileName</span><span> · </span>
+                                            }
+                                            <span>Giọng: @p.Voice</span> · <span>@p.UpdatedAt.ToString("dd/MM/yyyy HH:mm")</span>
                                         </div>
                                         <div class="hub-project-card__actions">
                                             <button type="button" class="btn-hub-open-editor" onclick="openProjectInEditor(@p.Id)">Mở biên tập ➔</button>
@@ -504,9 +513,9 @@
 
             <!-- Ở giữa: Tiêu đề bài giảng (Editable) + Huy hiệu trạng thái -->
             <div class="studio-header__center">
-                <h1 id="studioProjectTitle" class="studio-header__title" contenteditable="true" title="Bấm để chỉnh sửa tên bài giảng">@activeProject.Title</h1>
-                <span id="studioBadgeStatus" class="studio-status-pill status-@activeProject.Status.ToLower()">@activeProject.Status</span>
-                <span class="studio-header__scenes-count">@activeProject.Scenes.Count cảnh</span>
+                <h1 id="studioProjectTitle" class="studio-header__title" contenteditable="true" title="Bấm để chỉnh sửa tên bài giảng">@(activeProject?.Title ?? "Bài giảng mới")</h1>
+                <span id="studioBadgeStatus" class="studio-status-pill status-@(activeProject?.Status?.ToLower() ?? "draft")">@(activeProject?.Status ?? "Draft")</span>
+                <span class="studio-header__scenes-count">@(activeProject?.Scenes?.Count ?? 0) cảnh</span>
             </div>
 
             <!-- Góc phải: 1 nút phụ Kế hoạch AI + 1 nút chính Xuất video (gom gọn), Theme & Tài khoản -->
@@ -545,6 +554,15 @@
                                 </svg>
                                 <span>Render MP4 (Server)</span>
                             </button>
+                            <div id="studioRenderProgress" class="studio-render-progress hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                                <div class="studio-render-progress__head">
+                                    <span id="studioRenderProgressLabel" class="studio-render-progress__label">Đang chuẩn bị...</span>
+                                    <span id="studioRenderProgressPct" class="studio-render-progress__pct">0%</span>
+                                </div>
+                                <div class="studio-render-progress__track">
+                                    <div id="studioRenderProgressFill" class="studio-render-progress__fill" style="width: 0%;"></div>
+                                </div>
+                            </div>
                         </div>
                         <div class="dropdown-divider"></div>
                         <button type="button" id="btnOpenPreview" class="studio-dropdown-item" title="Xem composition HyperFrames">
@@ -648,12 +666,12 @@
                     <!-- PANE 1: PHÂN CẢNH KỊCH BẢN -->
                     <div id="paneScenes" class="studio-tab-pane active" role="tabpanel" aria-labelledby="tabNavScenes">
                         <div class="studio-panel-actions">
-                            <span class="studio-panel-title">Phân cảnh kịch bản (@activeProject.Scenes.Count cảnh)</span>
+                            <span class="studio-panel-title">Phân cảnh kịch bản (@(activeProject?.Scenes?.Count ?? 0) cảnh)</span>
                             <button type="button" id="btnAddScene" class="btn-studio-action btn-studio-action--ghost btn-sm" title="Thêm phân cảnh mới">+ Thêm cảnh</button>
                         </div>
 
-                        <div id="scenesList" class="studio-scenes-list" data-active-project-id="@activeProject.Id">
-                            @if (activeProject.Scenes.Count == 0)
+                        <div id="scenesList" class="studio-scenes-list" data-active-project-id="@(activeProject?.Id.ToString() ?? "")">
+                            @if (activeProject?.Scenes == null || activeProject.Scenes.Count == 0)
                             {
                                 <div class="studio-scenes-empty" id="scenesEmptyState">
                                     <p>Chưa có phân cảnh nào.</p>
@@ -662,9 +680,9 @@
                                     </button>
                                 </div>
                             }
-                            @for (int i = 0; i < activeProject.Scenes.Count; i++)
+                            @for (int i = 0; i < (activeProject?.Scenes?.Count ?? 0); i++)
                             {
-                                var scene = activeProject.Scenes[i];
+                                var scene = activeProject!.Scenes[i];
                                 <div class="scene-item @(i == 0 ? "active" : "")" 
                                      data-scene-id="@scene.Id" 
                                      data-order="@scene.OrderIndex"
@@ -676,12 +694,15 @@
                                      data-sub-pos="@(scene.SubtitlePosition ?? "bottom")">
                                     <div class="scene-item__header">
                                         <div class="scene-item__meta">
-                                            <span class="scene-badge">Cảnh @(scene.OrderIndex + 1)</span>
+                                            <span class="scene-badge">Cảnh @(i + 1)</span>
                                             <span class="scene-title-text" contenteditable="true" title="Bấm để sửa tiêu đề cảnh">@scene.Title</span>
                                         </div>
                                         <div class="scene-item__controls">
                                             <span class="scene-duration">@(scene.DurationSeconds.ToString("0.#"))s</span>
-                                            <button type="button" class="btn-delete-scene" title="Xóa phân cảnh" onclick="deleteSceneItem(@scene.Id, event)">✕</button>
+                                            <button type="button" class="btn-scene-mini btn-scene-move-up" data-scene-id="@scene.Id" title="Di chuyển lên" aria-label="Di chuyển cảnh lên" @(i == 0 ? "disabled" : null) onclick="moveSceneItem(@scene.Id, 'up', event)">↑</button>
+                                            <button type="button" class="btn-scene-mini btn-scene-move-down" data-scene-id="@scene.Id" title="Di chuyển xuống" aria-label="Di chuyển cảnh xuống" @(i == (activeProject?.Scenes?.Count ?? 1) - 1 ? "disabled" : null) onclick="moveSceneItem(@scene.Id, 'down', event)">↓</button>
+                                            <button type="button" class="btn-scene-mini btn-scene-duplicate" data-scene-id="@scene.Id" title="Nhân bản phân cảnh" aria-label="Nhân bản phân cảnh" onclick="duplicateSceneItem(@scene.Id, event)">⧉</button>
+                                            <button type="button" class="btn-delete-scene" data-scene-id="@scene.Id" title="Xóa phân cảnh" aria-label="Xóa phân cảnh" onclick="deleteSceneItem(@scene.Id, event)">✕</button>
                                         </div>
                                     </div>
 
@@ -735,8 +756,13 @@
                                         </button>
                                         <button type="button" class="btn-scene-action btn-gen-image" onclick="generateSceneImage(@scene.Id, this)">
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                                            <span>Tạo Ảnh</span>
+                                            <span>Tạo Ảnh AI</span>
                                         </button>
+                                        <label class="btn-scene-action btn-choose-image" title="Chọn ảnh từ máy tính cho phân cảnh này">
+                                            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="scene-file-input" onchange="uploadSceneCustomImage(@scene.Id, this)" style="display:none;" />
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                            <span>Ảnh</span>
+                                        </label>
                                         <button type="button" class="btn-scene-action btn-save-scene" onclick="saveSceneChanges(@scene.Id, this)">
                                             <span>Lưu</span>
                                         </button>
@@ -764,7 +790,7 @@
                             <div class="dropzone-text">Kéo thả hoặc bấm để nạp tài liệu</div>
                             <div class="dropzone-subtext">Hỗ trợ PDF, PPTX, DOCX, TXT, MD</div>
                             <input type="file" id="sourceFileInput" class="file-input-hidden" accept=".pdf,.pptx,.docx,.txt,.md" />
-                            <div id="selectedFileInfo" class="selected-file-info hidden"></div>
+                            <div id="selectedFileInfo" class="selected-file-info @(!string.IsNullOrWhiteSpace(activeProject?.SourceFileName) ? "is-success" : "hidden")">@(!string.IsNullOrWhiteSpace(activeProject?.SourceFileName) ? $"✓ Đã nạp: {activeProject!.SourceFileName}" : "")</div>
                         </div>
 
                         <!-- Dropzone Ảnh Avatar Giảng viên (Tier 17) -->
@@ -776,10 +802,11 @@
                                 </svg>
                             </div>
                             <div class="dropzone-text">Ảnh chân dung Giảng viên AI</div>
-                            <div class="dropzone-subtext">Tùy chọn hiển thị avatar góc bài giảng</div>
+                            <div class="dropzone-subtext">Chọn hoặc thêm nhiều ảnh (tối đa 6 ảnh · PNG, JPG, WEBP)</div>
                             <input type="file" id="avatarFileInput" class="file-input-hidden" accept="image/*" multiple />
                             <div id="selectedAvatarInfo" class="selected-file-info hidden"></div>
                         </div>
+                        <div id="sidebarAvatarPreviewStrip" class="avatar-preview-strip"></div>
 
                         <div class="assets-quick-tools">
                             <button type="button" class="btn-studio-action btn-studio-action--primary w-full" onclick="document.getElementById('btnOpenPlanModal').click()">
@@ -827,18 +854,29 @@
                 <section class="studio-stage-screen" aria-label="Màn hình xem trước phân cảnh">
                     <div class="stage-header">
                         <div class="stage-title-info">
-                            <span id="activeSceneIndicator" class="active-scene-pill">@(hasScenes ? $"Cảnh 1: {activeProject.Scenes[0].Title}" : "Chưa có phân cảnh")</span>
+                            <span id="activeSceneIndicator" class="active-scene-pill">@(hasScenes ? $"Cảnh 1: {activeProject!.Scenes[0].Title}" : "Chưa có phân cảnh")</span>
+                            <span id="vieneuStatusBadge" class="vieneu-status-pill hidden" aria-live="polite"></span>
                         </div>
-                        <div class="stage-aspect-ratio-controls">
-                            <button type="button" id="btnAspect169" class="btn-aspect active" title="Tỉ lệ chuẩn 16:9 (Ngang)">16:9</button>
-                            <button type="button" id="btnAspect916" class="btn-aspect" title="Tỉ lệ dọc 9:16 (Shorts/TikTok)">9:16</button>
+                        <div class="stage-aspect-ratio-controls" data-aspect-locked="@(isAspectLocked ? "true" : "false")">
+                            @if (!isAspectLocked || activeAspect == "16:9")
+                            {
+                                <button type="button" id="btnAspect169" class="btn-aspect @(activeAspect == "16:9" ? "active" : "")" title="Tỉ lệ chuẩn 16:9 (Ngang)">16:9</button>
+                            }
+                            @if (!isAspectLocked || activeAspect == "9:16")
+                            {
+                                <button type="button" id="btnAspect916" class="btn-aspect @(activeAspect == "9:16" ? "active" : "")" title="Tỉ lệ dọc 9:16 (Shorts/TikTok)">9:16</button>
+                            }
+                            @if (!isAspectLocked || activeAspect == "1:1")
+                            {
+                                <button type="button" id="btnAspect11" class="btn-aspect @(activeAspect == "1:1" ? "active" : "")" title="Tỉ lệ vuông 1:1 (Instagram/Facebook)">1:1</button>
+                            }
                         </div>
                     </div>
 
                     <!-- KHUNG CANVAS XEM TRƯỚC BÀI GIẢNG -->
-                    <div class="stage-canvas-wrapper aspect-16-9" id="stageCanvasWrapper">
+                    <div class="stage-canvas-wrapper @aspectClass" id="stageCanvasWrapper">
                         <div id="stageMediaPlaceholder" class="stage-media-placeholder">
-                            <canvas id="stageCyberCanvas" class="stage-cyber-canvas" width="640" height="360"></canvas>
+                            <canvas id="stageCyberCanvas" class="stage-cyber-canvas" width="@initCanvasW" height="@initCanvasH"></canvas>
                             <img id="stageImagePreview" class="stage-image-preview hidden" src="" alt="Hình ảnh phân cảnh" />
                             <div class="stage-overlay-watermark">
                                 <span class="stage-brand">COW.AI STUDIO · BÀI GIẢNG ĐIỆN TỬ</span>
@@ -846,9 +884,11 @@
                             </div>
 
                             <div class="stage-caption-container" id="stageCaptionContainer">
-                                <h3 id="stageCaptionTitle" class="stage-caption-title">@(activeProject.Scenes.FirstOrDefault()?.Title ?? activeProject.Title)</h3>
-                                <p id="stageCaptionSubtitle" class="stage-caption-subtitle">@(activeProject.Scenes.FirstOrDefault()?.Content ?? "Chưa có kịch bản phân cảnh. Mở Kế hoạch Auto-Video hoặc bấm + Thêm cảnh để bắt đầu.")</p>
+                                <h3 id="stageCaptionTitle" class="stage-caption-title">@(activeProject?.Scenes?.FirstOrDefault()?.Title ?? activeProject?.Title ?? "Bài giảng mới")</h3>
+                                <p id="stageCaptionSubtitle" class="stage-caption-subtitle">@(activeProject?.Scenes?.FirstOrDefault()?.Content ?? "Chưa có kịch bản phân cảnh. Mở Kế hoạch Auto-Video hoặc bấm + Thêm cảnh để bắt đầu.")</p>
                             </div>
+
+                            <div id="stageAvatarOverlay" class="stage-avatar-overlay hidden" aria-label="Ảnh chân dung Giảng viên"></div>
 
                             <!-- Thanh hiển thị trực quan âm thanh VieNeu -->
                             <div id="stageAudioBars" class="stage-audio-visualizer hidden">
@@ -869,8 +909,8 @@
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
                             </button>
                             <button type="button" id="btnPlayPause" class="btn-stage-control btn-play-pause" title="Phát / Tạm dừng">
-                                <svg id="iconPlay" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                <svg id="iconPause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="hidden"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                <svg id="iconPlay" class="icon-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                <svg id="iconPause" class="icon-pause hidden" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
                             </button>
                             <button type="button" id="btnNextScene" class="btn-stage-control" title="Phân cảnh tiếp theo">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
@@ -886,8 +926,12 @@
                         </div>
 
                         <div class="stage-fullscreen-wrapper">
-                            <button type="button" id="btnFullscreenStage" class="btn-stage-control" title="Toàn màn hình sân khấu">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                            <button type="button" id="btnTogglePlayerBgm" class="btn-stage-control active" title="Bật/Tắt Nhạc nền & Hiệu ứng âm thanh (BGM + SFX)">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                            </button>
+                            <button type="button" id="btnFullscreenStage" class="btn-stage-control" title="Phóng to toàn màn hình">
+                                <svg class="icon-fullscreen-enter" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                                <svg class="icon-fullscreen-exit hidden" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>
                             </button>
                         </div>
                     </div>
@@ -916,7 +960,7 @@
                     <div class="timeline-track-container" id="timelineTrackContainer">
                         <div class="timeline-playhead" id="timelinePlayhead"></div>
                         <div class="timeline-track" id="timelineTrack">
-                            @if (activeProject.Scenes.Count == 0)
+                            @if (activeProject?.Scenes == null || activeProject.Scenes.Count == 0)
                             {
                                 <div class="timeline-empty-hint">
                                     <span>Chưa có phân cảnh nào. Nhấp "+ Thêm cảnh" ở cột trái hoặc tạo kịch bản từ nút "Kế hoạch Auto-Video".</span>
@@ -924,15 +968,15 @@
                             }
                             else
                             {
-                                @for (int i = 0; i < activeProject.Scenes.Count; i++)
+                                @for (int i = 0; i < (activeProject?.Scenes?.Count ?? 0); i++)
                                 {
-                                    var sc = activeProject.Scenes[i];
+                                    var sc = activeProject!.Scenes[i];
                                     <div class="timeline-scene-block @(i == 0 ? "active" : "")" 
                                          data-scene-id="@sc.Id" 
                                          data-duration="@sc.DurationSeconds"
                                          style="flex: @(sc.DurationSeconds > 0 ? sc.DurationSeconds : 5);"
                                          onclick="selectSceneFromTimeline(@sc.Id)">
-                                        <span class="block-title">Cảnh @(sc.OrderIndex + 1)</span>
+                                        <span class="block-title">Cảnh @(i + 1)</span>
                                         <span class="block-duration">@(sc.DurationSeconds.ToString("0.#"))s</span>
                                     </div>
                                 }
@@ -978,15 +1022,15 @@
                                         <line x1="12" y1="3" x2="12" y2="15"></line>
                                     </svg>
                                 </div>
-                                <div class="dropzone-text" id="fileDropLabel">Kéo thả hoặc bấm để chọn tài liệu</div>
-                                <div class="dropzone-subtext">Hỗ trợ PDF, PPTX, DOCX, TXT, MD</div>
-                                <input type="file" id="planSourceFileInput" class="file-input-hidden" accept=".pdf,.pptx,.docx,.txt,.md" />
-                                <div id="planSelectedFileInfo" class="selected-file-info hidden"></div>
+                                <div class="dropzone-text" id="fileDropLabel">@(!string.IsNullOrWhiteSpace(activeProject?.SourceFileName) ? $"✓ Đã nạp: {activeProject!.SourceFileName}" : "Kéo thả hoặc bấm để chọn tài liệu")</div>
+                                <div class="dropzone-subtext">MarkItDown 10.0.8 · PDF, PPTX, DOCX, XLSX, CSV, HTML, EPUB, IPYNB, TXT, MD</div>
+                                <input type="file" id="planSourceFileInput" class="file-input-hidden" accept=".pdf,.pptx,.docx,.xlsx,.csv,.html,.htm,.epub,.ipynb,.xml,.json,.txt,.md" />
+                                <div id="planSelectedFileInfo" class="selected-file-info @(!string.IsNullOrWhiteSpace(activeProject?.SourceFileName) ? "is-success" : "hidden")">@(!string.IsNullOrWhiteSpace(activeProject?.SourceFileName) ? $"✓ Đã nạp: {activeProject!.SourceFileName}" : "")</div>
                             </div>
                         </div>
 
                         <div class="studio-setting-group">
-                            <label class="studio-setting-label">2. Ảnh giảng viên AI (Tùy chọn, tối đa 3 ảnh)</label>
+                            <label class="studio-setting-label">2. Ảnh giảng viên AI (Tùy chọn, tối đa 6 ảnh · chọn thêm để cộng dồn)</label>
                             <div class="avatar-dropzone plan-avatar-dropzone" id="planAvatarDropzone" role="button" tabindex="0" aria-label="Chọn ảnh giảng viên AI">
                                 <div class="dropzone-icon">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1005,11 +1049,11 @@
                         <div class="studio-setting-group">
                             <label for="planVoiceSelect" class="studio-setting-label">3. Giọng đọc thuyết minh VieNeu 48kHz</label>
                             <select id="planVoiceSelect" class="studio-setting-select">
-                                <option value="Hải Đăng" selected="@(activeProject.Voice == "Hải Đăng")">Hải Đăng - Nam Miền Bắc (Chuẩn học thuật, truyền cảm)</option>
-                                <option value="Hoài My" selected="@(activeProject.Voice == "Hoài My")">Hoài My - Nữ Miền Bắc (Ấm áp, phát thanh viên)</option>
-                                <option value="Lan Nhi" selected="@(activeProject.Voice == "Lan Nhi")">Lan Nhi - Nữ Miền Nam (Tự nhiên, tươi sáng)</option>
-                                <option value="Nam Minh" selected="@(activeProject.Voice == "Nam Minh")">Nam Minh - Nam Miền Nam (Trầm ấm, lịch lãm)</option>
-                                <option value="Bình" selected="@(activeProject.Voice == "Bình")">Bình - Nam Miền Trung (Nội lực, khúc chiết)</option>
+                                <option value="Hải Đăng" selected="@(activeProject?.Voice == "Hải Đăng" || activeProject == null)">Hải Đăng - Nam Miền Bắc (Chuẩn học thuật, truyền cảm)</option>
+                                <option value="Hoài My" selected="@(activeProject?.Voice == "Hoài My")">Hoài My - Nữ Miền Bắc (Ấm áp, phát thanh viên)</option>
+                                <option value="Lan Nhi" selected="@(activeProject?.Voice == "Lan Nhi")">Lan Nhi - Nữ Miền Nam (Tự nhiên, tươi sáng)</option>
+                                <option value="Nam Minh" selected="@(activeProject?.Voice == "Nam Minh")">Nam Minh - Nam Miền Nam (Trầm ấm, lịch lãm)</option>
+                                <option value="Bình" selected="@(activeProject?.Voice == "Bình")">Bình - Nam Miền Trung (Nội lực, khúc chiết)</option>
                             </select>
                         </div>
                     </div>
@@ -1020,17 +1064,19 @@
                         <div class="studio-setting-group">
                             <label class="studio-setting-label">4. Kiểu trình bày bài giảng (3-Zone HyperFrames Layout)</label>
                             <div class="composition-type-selector">
-                                <button type="button" class="btn-comp-type active" id="btnTypeComparison" data-type="comparison">
+                                <button type="button" class="btn-comp-type @(activeProject?.VideoType != "sequential" ? "active" : "")" id="btnTypeComparison" data-type="comparison">
                                     <span class="comp-icon">⚖</span>
-                                    <span class="comp-label">So sánh / Đối chiếu</span>
-                                    <span class="comp-desc">Hai cột trực quan với slide chính và luận điểm phụ</span>
+                                    <span class="comp-label">So sánh / Đối chiếu (Skill So sánh)</span>
+                                    <span class="comp-desc">2 thẻ đối chiếu + huy hiệu VS, nhịp 6-beat (Hook ➔ Giải A/B ➔ Đối chiếu ➔ Đúc kết)</span>
                                 </button>
-                                <button type="button" class="btn-comp-type" id="btnTypeSequential" data-type="sequential">
+                                <button type="button" class="btn-comp-type @(activeProject?.VideoType == "sequential" ? "active" : "")" id="btnTypeSequential" data-type="sequential">
                                     <span class="comp-icon">➔</span>
-                                    <span class="comp-label">Tuần tự / Quy trình</span>
-                                    <span class="comp-desc">Các bước logic tuần tự theo dòng thời gian bài giảng</span>
+                                    <span class="comp-label">Tuần tự / Bài giảng (Skill Không so sánh)</span>
+                                    <span class="comp-desc">1-Khung + MC chỉ bảng (9:16) hoặc Widescreen Kinetic Typography + B-Roll (16:9)</span>
                                 </button>
                             </div>
+
+
                         </div>
 
                         <!-- Tùy chọn nâng cao -->
@@ -1051,8 +1097,14 @@
 
                         <!-- Textarea nội dung bổ sung (Full flex height) -->
                         <div class="studio-setting-group studio-setting-group--grow">
-                            <label for="inputSourceContent" class="studio-setting-label">5. Nội dung đề tài hoặc văn bản trích xuất từ tài liệu</label>
-                            <textarea id="inputSourceContent" class="studio-modal-textarea studio-modal-textarea--grow" placeholder="Nội dung tệp sẽ tự động hiển thị ở đây sau khi nạp ở cột trái, hoặc bạn có thể nhập trực tiếp dàn ý bài giảng..."></textarea>
+                            <div class="source-md-toolbar">
+                                <label for="inputSourceContent" class="studio-setting-label">5. Bản chuẩn hóa Markdown (.md) từ tài liệu</label>
+                                <div class="source-md-toolbar__actions">
+                                    <span id="sourceMdStatsBadge" class="source-md-stats-badge">Đang tính dung lượng & số phút...</span>
+                                    <button type="button" id="btnDownloadSourceMd" class="btn-studio-action btn-studio-action--secondary btn-xs" title="Tải về bản Markdown nguồn đã chuyển đổi">⬇ Tải Source .md</button>
+                                </div>
+                            </div>
+                            <textarea id="inputSourceContent" class="studio-modal-textarea studio-modal-textarea--grow" placeholder="Nội dung tệp sau khi chuyển sang chuẩn Markdown (.md) sẽ hiển thị ở đây, hoặc bạn có thể nhập trực tiếp dàn ý bài giảng...">@(activeProject?.SourceMarkdown ?? activeProject?.SourceContent ?? "")</textarea>
                         </div>
                     </div>
                 </div>
@@ -1060,11 +1112,14 @@
                 <!-- Tab 2: Review, Edit & Proceed (Full-Screen Plan Workspace) -->
                 <div class="review-pane hidden" id="paneReview">
                     <div class="review-pane__toolbar">
-                        <span class="review-pane__hint">Bản kế hoạch Markdown — xem dạng thẻ trực quan hoặc chuyển sang chỉnh sửa thô:</span>
-                        <button type="button" id="btnTogglePlanEditMode" class="btn-studio-action btn-studio-action--secondary">Chỉnh sửa kịch bản ✎</button>
+                        <div id="planMetaSummaryBar" class="plan-meta-summary-bar">Bản kịch bản video Markdown (.md) chi tiết:</div>
+                        <div class="review-pane__toolbar-actions">
+                            <button type="button" id="btnDownloadScriptMd" class="btn-studio-action btn-studio-action--secondary">⬇ Tải Kịch bản .md</button>
+                            <button type="button" id="btnTogglePlanEditMode" class="btn-studio-action btn-studio-action--secondary">Chỉnh sửa kịch bản ✎</button>
+                        </div>
                     </div>
 
-                    <textarea id="planMarkdownEditor" class="plan-markdown-editor" spellcheck="false" style="display: none;"></textarea>
+                    <textarea id="planMarkdownEditor" class="plan-markdown-editor" spellcheck="false" style="display: none;">@(activeProject?.PlanMarkdown ?? "")</textarea>
 
                     <div class="plan-review-preview" id="planReviewCards"></div>
                 </div>
@@ -1120,5 +1175,6 @@
 </div>
 
 @section Scripts {
+    <script src="~/lib/gsap/gsap.min.js" asp-append-version="true"></script>
     <script src="~/js/modules/studio-player.js" asp-append-version="true"></script>
 }

@@ -37,15 +37,15 @@
                 <div class="ai-panel__title-group">
                     <h1 class="ai-panel__title">Tóm tắt tài liệu</h1>
                 </div>
-                <div class="ai-badge ai-badge--tag">
-                    <span>NLP Engine</span>
+                <div class="ai-badge ai-badge--tag" id="summaryTrainedBadge">
+                    <span>cow-ai:latest</span>
                 </div>
             </div>
 
             <!-- Tabs chuyển đổi phương thức nhập -->
             <div class="doc-tabs">
                 <button type="button" id="tabTextBtn" class="doc-tab active" aria-label="Nhập văn bản">Nhập văn bản</button>
-                <button type="button" id="tabFileBtn" class="doc-tab" aria-label="Tải tệp tin">Tải tệp tin (.pdf, .docx, .txt)</button>
+                <button type="button" id="tabFileBtn" class="doc-tab" aria-label="Tải tệp tin">Tải tệp → Markdown</button>
             </div>
 
             <form id="summaryForm" class="ai-form" onsubmit="return false;">
@@ -67,11 +67,13 @@
                 <!-- Khung Kéo thả tệp tin (Drag & Drop Zone) -->
                 <div id="fileInputContainer" class="ai-form-group hidden">
                     <label class="ai-label">Chọn hoặc kéo thả tệp tin</label>
-                    <div id="summaryDropzone" class="doc-dropzone" role="button" aria-label="Kéo thả tệp tin hoặc nhấp để chọn">
-                        <div class="doc-dropzone__icon">📁</div>
-                        <div class="doc-dropzone__text">Kéo thả tài liệu vào đây hoặc nhấp để chọn tệp</div>
-                        <div class="doc-dropzone__subtext">PDF · DOCX · TXT · MD · 25MB</div>
-                        <input type="file" id="summaryFileInput" accept=".pdf,.docx,.txt,.md" class="hidden" aria-label="Tải tệp lên" />
+                    <div id="summaryDropzone" class="doc-dropzone" role="button" tabindex="0" aria-label="Kéo thả tệp tin hoặc nhấp để chọn">
+                        <div class="doc-dropzone__icon" aria-hidden="true">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        </div>
+                        <div class="doc-dropzone__text">Kéo thả tài liệu vào đây hoặc nhấp để chuyển sang Markdown</div>
+                        <div class="doc-dropzone__subtext">PDF · DOCX · PPTX · XLSX · CSV · HTML · EPUB · IPYNB · JSON · TXT · MD (MarkItDown 10.0.8)</div>
+                        <input type="file" id="summaryFileInput" accept=".pdf,.pptx,.docx,.xlsx,.csv,.html,.htm,.epub,.ipynb,.json,.xml,.txt,.md" class="hidden" aria-label="Tải tệp lên" />
                     </div>
                     <div id="fileSelectedInfo" class="doc-file-info hidden">
                         <span id="fileNameDisplay">tailieu.pdf</span>
@@ -87,6 +89,18 @@
                         <button type="button" class="ai-chip" data-length="detailed">Bản phân tích chi tiết</button>
                         <button type="button" class="ai-chip" data-length="action">Danh sách hành động (Action Items)</button>
                     </div>
+                </div>
+
+                <!-- Bộ chọn Model AI (ưu tiên Model đã train cục bộ) -->
+                <div class="ai-form-group">
+                    <label for="summaryModelSelect" class="ai-label">Mô hình AI xử lý</label>
+                    <select id="summaryModelSelect" class="form-control ai-select" aria-label="Chọn mô hình AI tóm tắt">
+                        <option value="cow-ai-local" selected>COW.AI Đã Train (cow-ai:latest · Local)</option>
+                        <option value="qwen25-studio">Qwen 2.5 7B (Local)</option>
+                        <option value="qwen25-coder">Qwen 2.5 Coder 7B (Local)</option>
+                        <option value="gemini">Gemini Flash (Cloud)</option>
+                        <option value="deepseek">DeepSeek R1 (Cloud)</option>
+                    </select>
                 </div>
 
                 <button type="submit" id="summarySubmitBtn" class="ai-btn-primary" aria-label="Tóm tắt ngay">
@@ -109,7 +123,9 @@
 
             <div id="summaryOutputContainer" class="summary-output">
                 <div id="summaryEmptyState" class="image-preview-empty">
-                    <div class="image-preview-empty__icon">📑</div>
+                    <div class="image-preview-empty__icon" aria-hidden="true">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    </div>
                     <div class="image-preview-empty__text">Chưa có kết quả tóm tắt</div>
                 </div>
 
@@ -126,11 +142,17 @@
                     </svg>
                     <span>Sao chép kết quả</span>
                 </button>
+                <button type="button" id="exportMdBtn" class="ai-btn-secondary" aria-label="Xuất file Markdown">
+                    <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Xuất .md</span>
+                </button>
                 <button type="button" id="exportTxtBtn" class="ai-btn-secondary" aria-label="Xuất file văn bản">
                     <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    <span>Xuất file .txt</span>
+                    <span>Xuất .txt</span>
                 </button>
             </div>
         </section>

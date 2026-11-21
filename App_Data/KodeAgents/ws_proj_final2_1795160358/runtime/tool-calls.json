@@ -1,0 +1,103 @@
+[
+  {
+    "id": "call_34bfae28c9b9",
+    "name": "safe_delete_to_trash",
+    "input": {
+      "paths": [
+        "old1.txt",
+        "old2.txt"
+      ],
+      "reason": "C\u00E1c file kh\u00F4ng c\u00F2n c\u1EA7n thi\u1EBFt"
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": "{\u0022success\u0022:true,\u0022sessionId\u0022:\u0022proj_final2_1795160358\u0022,\u0022movedCount\u0022:2,\u0022moved\u0022:[{\u0022id\u0022:\u0022ea67295d26\u0022,\u0022originalPath\u0022:\u0022old1.txt\u0022,\u0022backupPath\u0022:\u0022.cowai_trash/proj_final2_1795160358/ea67295d26_old1.txt\u0022,\u0022sizeBytes\u0022:10},{\u0022id\u0022:\u0022a104c55622\u0022,\u0022originalPath\u0022:\u0022old2.txt\u0022,\u0022backupPath\u0022:\u0022.cowai_trash/proj_final2_1795160358/a104c55622_old2.txt\u0022,\u0022sizeBytes\u0022:10}]}",
+    "error": null,
+    "isError": false,
+    "startedAt": 1795160369090,
+    "completedAt": 1795160369428,
+    "durationMs": 338,
+    "createdAt": 1795160369061,
+    "updatedAt": 1795160369430,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795160369061,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795160369090,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795160369428,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795160369430,
+        "note": "final_result"
+      }
+    ]
+  },
+  {
+    "id": "call_b757713fb782",
+    "name": "fs_write",
+    "input": {
+      "path": "index.html",
+      "content": "\u003C!DOCTYPE html\u003E\n\u003Chtml lang=\u0022en\u0022\u003E\n\u003Chead\u003E\n    \u003Cmeta charset=\u0022UTF-8\u0022\u003E\n    \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0\u0022\u003E\n    \u003Ctitle\u003ETrang ch\u1EE7\u003C/title\u003E\n\u003C/head\u003E\n\u003Cbody\u003E\n    \u003Ch1\u003EXin ch\u00E0o, \u0111\u00E2y l\u00E0 trang ch\u1EE7!\u003C/h1\u003E\n\u003C/body\u003E\n\u003C/html\u003E"
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": {
+      "path": "index.html",
+      "bytesWritten": 250,
+      "success": true
+    },
+    "error": null,
+    "isError": false,
+    "startedAt": 1795160369436,
+    "completedAt": 1795160369457,
+    "durationMs": 21,
+    "createdAt": 1795160369434,
+    "updatedAt": 1795160369457,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795160369434,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795160369436,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795160369457,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795160369457,
+        "note": "final_result"
+      }
+    ]
+  }
+]

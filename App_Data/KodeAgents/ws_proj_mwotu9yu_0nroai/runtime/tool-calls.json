@@ -1,0 +1,224 @@
+[
+  {
+    "id": "call_g99s3a3p",
+    "name": "fs_list",
+    "input": {
+      "includeHidden": false,
+      "path": "C:\\Users\\admin\\Downloads\\Folder"
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": {
+      "path": "C:\\Users\\admin\\Downloads\\Folder",
+      "count": 1,
+      "entries": [
+        {
+          "name": "code.py",
+          "type": "file",
+          "size": 47,
+          "modified": "2026-11-20T09:42:28.7474749Z"
+        }
+      ]
+    },
+    "error": null,
+    "isError": false,
+    "startedAt": 1795170025086,
+    "completedAt": 1795170025099,
+    "durationMs": 13,
+    "createdAt": 1795170025050,
+    "updatedAt": 1795170025101,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795170025050,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795170025086,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795170025099,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795170025101,
+        "note": "final_result"
+      }
+    ]
+  },
+  {
+    "id": "call_hrx5jkb2",
+    "name": "fs_glob",
+    "input": {
+      "pattern": "*.py",
+      "maxResults": null
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": {
+      "pattern": "*.py",
+      "files": [
+        "code.py"
+      ],
+      "count": 1,
+      "truncated": false
+    },
+    "error": null,
+    "isError": false,
+    "startedAt": 1795170026282,
+    "completedAt": 1795170026297,
+    "durationMs": 15,
+    "createdAt": 1795170026275,
+    "updatedAt": 1795170026297,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795170026275,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795170026282,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795170026297,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795170026297,
+        "note": "final_result"
+      }
+    ]
+  },
+  {
+    "id": "call_j7zjzy1g",
+    "name": "fs_list",
+    "input": {
+      "includeHidden": false,
+      "path": "C:\\Users\\admin\\Downloads\\Folder"
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": {
+      "path": "C:\\Users\\admin\\Downloads\\Folder",
+      "count": 1,
+      "entries": [
+        {
+          "name": "code.py",
+          "type": "file",
+          "size": 47,
+          "modified": "2026-11-20T09:42:28.7474749Z"
+        }
+      ]
+    },
+    "error": null,
+    "isError": false,
+    "startedAt": 1795170027610,
+    "completedAt": 1795170027612,
+    "durationMs": 2,
+    "createdAt": 1795170027608,
+    "updatedAt": 1795170027612,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795170027608,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795170027610,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795170027612,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795170027612,
+        "note": "final_result"
+      }
+    ]
+  },
+  {
+    "id": "call_lqhyfp74",
+    "name": "fs_read",
+    "input": {
+      "path": "C:\\Users\\admin\\Downloads\\Folder\\code.py",
+      "startLine": 1,
+      "endLine": null
+    },
+    "state": "COMPLETED",
+    "approval": {
+      "required": false,
+      "decision": null,
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null,
+      "meta": null
+    },
+    "result": {
+      "path": "C:\\Users\\admin\\Downloads\\Folder\\code.py",
+      "content": "# \u0110\u00E2y l\u00E0 file code.py\nprint(\u0027Hello, World!\u0027)",
+      "lines": 2
+    },
+    "error": null,
+    "isError": false,
+    "startedAt": 1795170029286,
+    "completedAt": 1795170029314,
+    "durationMs": 28,
+    "createdAt": 1795170029281,
+    "updatedAt": 1795170029315,
+    "auditTrail": [
+      {
+        "state": "PENDING",
+        "timestamp": 1795170029281,
+        "note": "created"
+      },
+      {
+        "state": "EXECUTING",
+        "timestamp": 1795170029286,
+        "note": "execution start"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795170029314,
+        "note": "execution end"
+      },
+      {
+        "state": "COMPLETED",
+        "timestamp": 1795170029315,
+        "note": "final_result"
+      }
+    ]
+  }
+]

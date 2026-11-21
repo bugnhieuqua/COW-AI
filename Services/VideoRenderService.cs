@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
@@ -11,12 +12,14 @@ namespace COW_AI.Services;
 public class VideoRenderService : IVideoRenderService
 {
     private static readonly SemaphoreSlim _renderLock = new(1, 1);
+    private static readonly ConcurrentDictionary<int, RenderProgressSnapshot> _progressMap = new();
     private static bool? _nvencSupported;
 
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _env;
     private readonly IConfiguration _config;
     private readonly IAutoVideoService _autoVideo;
+    private readonly IVieNeuTtsService _vieNeuTts;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<VideoRenderService> _logger;
     private readonly string _ffmpegPath;
@@ -29,6 +32,7 @@ public class VideoRenderService : IVideoRenderService
         IWebHostEnvironment env,
         IConfiguration config,
         IAutoVideoService autoVideo,
+        IVieNeuTtsService vieNeuTts,
         IHttpClientFactory httpClientFactory,
         ILogger<VideoRenderService> logger)
     {
@@ -36,6 +40,7 @@ public class VideoRenderService : IVideoRenderService
         _env = env;
         _config = config;
         _autoVideo = autoVideo;
+        _vieNeuTts = vieNeuTts;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
 
@@ -73,6 +78,18 @@ public class VideoRenderService : IVideoRenderService
             if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) return path;
         }
         return string.Empty;
+    }
+
+    public RenderProgressSnapshot GetRenderProgress(int projectId)
+    {
+        return _progressMap.TryGetValue(projectId, out var snap)
+            ? snap
+            : new RenderProgressSnapshot("idle", 0, "Sẵn sàng xuất video", false, DateTime.UtcNow);
+    }
+
+    private static void ReportProgress(int projectId, string step, int percent, string detail, bool isRunning = true)
+    {
+        _progressMap[projectId] = new RenderProgressSnapshot(step, Math.Clamp(percent, 0, 100), detail, isRunning, DateTime.UtcNow);
     }
 
     public bool IsFfmpegAvailable()
@@ -125,12 +142,18 @@ public class VideoRenderService : IVideoRenderService
         var tempDir = Path.Combine(rendersDir, $"temp_{projectId}_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
+        ReportProgress(projectId, "queue", 5, "Đang xếp hàng trên GPU...");
         await _renderLock.WaitAsync(ct);
         try
         {
-            bool isPortrait = string.Equals(aspectRatio, "9:16", StringComparison.OrdinalIgnoreCase);
-            int width = isPortrait ? 1080 : 1920;
-            int height = isPortrait ? 1920 : 1080;
+            ReportProgress(projectId, "prepare", 12, $"Chuẩn bị ảnh & âm thanh ({project.Scenes.Count} phân cảnh)...");
+            var normalizedAspect = (aspectRatio ?? project.AspectRatio ?? "16:9").Trim();
+            var (width, height, aspectTag) = normalizedAspect switch
+            {
+                "9:16" => (1080, 1920, "9x16"),
+                "1:1" => (1080, 1080, "1x1"),
+                _ => (1920, 1080, "16x9")
+            };
             const int fps = 30;
             const double fadeDur = 0.35;
 
@@ -159,6 +182,42 @@ public class VideoRenderService : IVideoRenderService
                 // 2. Resolve Audio (chuẩn hóa sang WAV 48kHz stereo đúng độ dài cảnh)
                 var normalizedAudio = Path.Combine(tempDir, $"vo_{i:D3}.wav");
                 string? sourceAudio = ResolveLocalWebPath(scene.AudioUrl);
+
+                // Tự động sinh giọng đọc VieNeu-TTS 48kHz nếu cảnh chưa có âm thanh
+                if (string.IsNullOrWhiteSpace(sourceAudio) || !File.Exists(sourceAudio))
+                {
+                    var spokenText = !string.IsNullOrWhiteSpace(scene.TtsText)
+                        ? scene.TtsText
+                        : scene.Content;
+                    if (!string.IsNullOrWhiteSpace(spokenText))
+                    {
+                        var cleanText = System.Text.RegularExpressions.Regex.Replace(spokenText, @"\[/?kw\]", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+                        var voiceName = project.Voice ?? "Hải Đăng";
+                        try
+                        {
+                            var (ttsOk, ttsErr, ttsUrl, ttsDur) = await _vieNeuTts.GenerateAudioAsync(
+                                cleanText,
+                                voiceName,
+                                "studio/audio",
+                                ct);
+                            if (ttsOk && !string.IsNullOrWhiteSpace(ttsUrl))
+                            {
+                                scene.AudioUrl = ttsUrl;
+                                if (ttsDur > 0)
+                                {
+                                    scene.DurationSeconds = Math.Max(scene.DurationSeconds, ttsDur + 0.3);
+                                    sceneDur = scene.DurationSeconds;
+                                }
+                                sourceAudio = ResolveLocalWebPath(ttsUrl);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Lỗi tự động sinh VieNeu-TTS cho cảnh {Order}", scene.OrderIndex);
+                        }
+                    }
+                }
+
                 if (!string.IsNullOrWhiteSpace(sourceAudio) && File.Exists(sourceAudio))
                 {
                     var padArgs = $"-y -i \"{sourceAudio}\" -af \"aresample=48000,apad=whole_dur={F(sceneDur)}\" -t {F(sceneDur)} -ac 2 -c:a pcm_s16le \"{normalizedAudio}\"";
@@ -182,6 +241,7 @@ public class VideoRenderService : IVideoRenderService
             double finalVideoDuration = Math.Max(1.0, totalDuration - videoOverlap);
 
             // 3. Master Audio Mixing 48kHz (Voice + SFX whoosh/hit + BGM Dynamic Ducking)
+            ReportProgress(projectId, "audio", 35, "Đang trộn Master Audio 48kHz (Voice + SFX + BGM Ducking)...");
             var masterAudioWav = Path.Combine(tempDir, "master_audio.wav");
             await BuildMasterAudioAsync(prepared, masterAudioWav, includeBgm, totalDuration, ct);
             if (!File.Exists(masterAudioWav))
@@ -189,27 +249,30 @@ public class VideoRenderService : IVideoRenderService
                 await GenerateSilenceWavAsync(masterAudioWav, totalDuration);
             }
 
-            var outFileName = $"video_proj_{projectId}_{(isPortrait ? "9x16" : "16x9")}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.mp4";
+            var outFileName = $"video_proj_{projectId}_{aspectTag}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.mp4";
             var outFilePath = Path.Combine(rendersDir, outFileName);
 
             // 4. Optional HyperFrames High-End Render Mode (fallback tự động về FFmpeg Nâng cấp)
             bool renderedByHyperFrames = false;
             if (string.Equals(renderMode, "hyperframes", StringComparison.OrdinalIgnoreCase))
             {
+                ReportProgress(projectId, "hyperframes", 55, "Đang render HyperFrames 3-Zone GSAP...");
                 renderedByHyperFrames = await TryRenderHyperFramesAsync(project, scenes, prepared, masterAudioWav, outFilePath, width, height, tempDir, ct);
             }
 
             // 5. FFmpeg Enhanced Render Mode (Ken Burns + Filter Preset + xfade + ASS Subtitle + NVENC/libx264)
             if (!renderedByHyperFrames)
             {
-                var (ok, err) = await RenderEnhancedFfmpegAsync(prepared, masterAudioWav, outFilePath, width, height, fps, fadeDur, tempDir, ct);
+                var (ok, err) = await RenderEnhancedFfmpegAsync(projectId, prepared, masterAudioWav, outFilePath, width, height, fps, fadeDur, tempDir, ct);
                 if (!ok || !File.Exists(outFilePath))
                 {
+                    ReportProgress(projectId, "error", 0, "FFmpeg render lỗi", isRunning: false);
                     return new VideoRenderResult(false, $"FFmpeg render lỗi: {err}", null, null, 0);
                 }
             }
 
             var videoUrl = $"/media/studio/renders/{outFileName}";
+            ReportProgress(projectId, "done", 100, "Hoàn tất xuất video MP4!", isRunning: false);
             _logger.LogInformation(
                 "Xuất video thành công cho dự án #{Id} ({Mode}, {Aspect}): {Url} ({Dur:0.0}s)",
                 projectId, renderedByHyperFrames ? "hyperframes" : "ffmpeg-enhanced", aspectRatio, videoUrl, finalVideoDuration);
@@ -218,6 +281,7 @@ public class VideoRenderService : IVideoRenderService
         }
         catch (Exception ex)
         {
+            ReportProgress(projectId, "error", 0, "Lỗi xuất video", isRunning: false);
             _logger.LogError(ex, "Lỗi trong quy trình ghép video cho dự án #{Id}", projectId);
             return new VideoRenderResult(false, "Lỗi ghép video: " + ex.Message, null, null, 0);
         }
@@ -432,6 +496,7 @@ public class VideoRenderService : IVideoRenderService
     }
 
     private async Task<(bool Ok, string? Error)> RenderEnhancedFfmpegAsync(
+        int projectId,
         List<PreparedScene> scenes,
         string masterAudioWav,
         string outFilePath,
@@ -445,6 +510,8 @@ public class VideoRenderService : IVideoRenderService
         var clipPaths = new List<string>();
         for (int i = 0; i < scenes.Count; i++)
         {
+            int pct = 42 + (int)Math.Round(((i + 1) / (double)Math.Max(1, scenes.Count)) * 38.0);
+            ReportProgress(projectId, "scenes", pct, $"Đang render cảnh {i + 1}/{scenes.Count} (Ken Burns + bộ lọc)...");
             var ps = scenes[i];
             var clipPath = Path.Combine(tempDir, $"clip_{i:D3}.mp4");
             int frames = Math.Max(fps, (int)Math.Ceiling(ps.DurationSeconds * fps));
@@ -466,6 +533,7 @@ public class VideoRenderService : IVideoRenderService
         }
 
         // Tạo file phụ đề ASS tiếng Việt (Be Vietnam Pro)
+        ReportProgress(projectId, "mux", 88, "Đang ghép chuyển cảnh xfade & burn-in phụ đề tiếng Việt (NVENC)...");
         var assPath = Path.Combine(tempDir, "subtitles.ass");
         await WriteAssSubtitlesAsync(scenes, assPath, width, height, fadeDur, ct);
         var assEscaped = EscapeFfmpegFilterPath(assPath);

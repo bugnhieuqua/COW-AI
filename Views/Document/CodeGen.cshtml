@@ -37,13 +37,13 @@
                 <div class="ai-panel__title-group">
                     <h1 class="ai-panel__title">Trợ lý viết code</h1>
                 </div>
-                <div class="ai-badge ai-badge--tag">
-                    <span>Multi-Language</span>
+                <div class="ai-badge ai-badge--tag" id="codeTrainedBadge">
+                    <span>cow-ai:latest</span>
                 </div>
             </div>
 
             <form id="codeGenForm" class="ai-form" onsubmit="return false;">
-                <!-- Chọn ngôn ngữ lập trình -->
+                <!-- Chọn ngôn ngữ & Model AI đã train -->
                 <div class="ai-form-group">
                     <label for="codeLanguageSelect" class="ai-label">Ngôn ngữ mục tiêu</label>
                     <select id="codeLanguageSelect" class="form-control ai-select" aria-label="Chọn ngôn ngữ lập trình">
@@ -52,6 +52,17 @@
                         <option value="javascript">JavaScript (ES6+)</option>
                         <option value="typescript">TypeScript</option>
                         <option value="sql">SQL Query</option>
+                    </select>
+                </div>
+
+                <div class="ai-form-group">
+                    <label for="codeModelSelect" class="ai-label">Mô hình AI lập trình</label>
+                    <select id="codeModelSelect" class="form-control ai-select" aria-label="Chọn mô hình AI viết code">
+                        <option value="cow-ai-local" selected>COW.AI Đã Train (cow-ai:latest · Local)</option>
+                        <option value="qwen25-coder">Qwen 2.5 Coder 7B (Chuyên Code · Local)</option>
+                        <option value="qwen25-studio">Qwen 2.5 7B (Local)</option>
+                        <option value="deepseek">DeepSeek R1 (Cloud)</option>
+                        <option value="gemini">Gemini Flash (Cloud)</option>
                     </select>
                 </div>
 
@@ -106,15 +117,24 @@
                         <span class="code-editor-dot code-editor-dot--green"></span>
                     </div>
                     <span id="codeFileNameDisplay" class="code-editor-filename">solution.py</span>
-                    <button type="button" id="copyCodeBtn" class="theme-btn" aria-label="Sao chép code">
-                        <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                    </button>
+                    <div class="code-editor-actions" style="display:inline-flex;align-items:center;gap:4px;">
+                        <button type="button" id="downloadCodeBtn" class="theme-btn" aria-label="Tải tệp mã nguồn" title="Tải tệp mã nguồn">
+                            <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                        </button>
+                        <button type="button" id="copyCodeBtn" class="theme-btn" aria-label="Sao chép code" title="Sao chép code">
+                            <svg class="icon-send" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
                 <div id="codeEmptyState" class="image-preview-empty">
-                    <div class="image-preview-empty__icon">💻</div>
+                    <div class="image-preview-empty__icon" aria-hidden="true">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                    </div>
                     <div class="image-preview-empty__text">Chưa có mã nguồn</div>
                 </div>
 
@@ -123,7 +143,7 @@
 
             <!-- Giải thích thuật toán -->
             <div id="codeExplanationBox" class="code-explanation-card hidden">
-                <strong>💡 Giải thích thuật toán:</strong>
+                <strong>Giải thích thuật toán</strong>
                 <p id="codeExplanationText" class="mt-2 mb-0"></p>
             </div>
         </section>

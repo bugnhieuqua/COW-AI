@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<Scene> Scenes => Set<Scene>();
+    public DbSet<WorkspaceSession> WorkspaceSessions => Set<WorkspaceSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

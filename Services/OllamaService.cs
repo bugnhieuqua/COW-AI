@@ -58,6 +58,7 @@ public class OllamaService
         {
             "cow-ai-local" or "cow-ai" or "cow-ai:latest" => _localDefaultModel,
             "qwen25-coder" or "qwen2.5-coder" or "qwen2.5-coder:7b" => "qwen2.5-coder:7b",
+            "qwen25-studio" or "qwen2.5" or "qwen2.5:7b" => "qwen2.5:7b",
             "gpt20-cloud" or "gpt20" or "gpt-oss-20b" => "gpt-oss:20b",
             "120b-cloud" or "120b" or "gpt-oss-120b" => "gpt-oss:120b",
             "mistral-nemo" or "neu" or "nemo" => "mistral-nemo:latest",
@@ -76,7 +77,46 @@ public class OllamaService
         if (key.StartsWith("local:")) return true;
 
         return key is "cow-ai-local" or "cow-ai" or "cow-ai:latest"
-                  or "qwen25-coder" or "qwen2.5-coder" or "qwen2.5-coder:7b";
+                  or "qwen25-coder" or "qwen2.5-coder" or "qwen2.5-coder:7b"
+                  or "qwen25-studio" or "qwen2.5" or "qwen2.5:7b";
+    }
+
+    /// <summary>
+    /// Liệt kê các model cục bộ đã cài đặt / đã train trên Ollama (localhost:11434/api/tags).
+    /// </summary>
+    public async Task<(bool Online, List<string> Models)> GetLocalModelsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var localRoot = _localBaseUrl.TrimEnd('/');
+            if (localRoot.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
+            {
+                localRoot = localRoot[..^3];
+            }
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+            using var resp = await _http.GetAsync($"{localRoot}/api/tags", cts.Token);
+            if (!resp.IsSuccessStatusCode) return (false, new List<string>());
+
+            using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(cts.Token), cancellationToken: cts.Token);
+            var list = new List<string>();
+            if (doc.RootElement.TryGetProperty("models", out var arr) && arr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in arr.EnumerateArray())
+                {
+                    if (item.TryGetProperty("name", out var nEl))
+                    {
+                        var name = nEl.GetString();
+                        if (!string.IsNullOrWhiteSpace(name)) list.Add(name);
+                    }
+                }
+            }
+            return (true, list);
+        }
+        catch
+        {
+            return (false, new List<string>());
+        }
     }
 
     /// <summary>

@@ -11,21 +11,31 @@ public class ImageController : Controller
 {
     private readonly LocalImageService _localImage;
     private readonly PromptService _promptService;
+    private readonly ImageQuotaService _quotaService;
     private readonly ILogger<ImageController>? _logger;
 
     public ImageController(
         LocalImageService localImage,
         PromptService promptService,
+        ImageQuotaService quotaService,
         ILogger<ImageController>? logger = null)
     {
         _localImage = localImage;
         _promptService = promptService;
+        _quotaService = quotaService;
         _logger = logger;
     }
 
     public IActionResult Index()
     {
         return View();
+    }
+
+    [HttpGet]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult QuotaStatus()
+    {
+        return Json(_quotaService.GetQuota(HttpContext));
     }
 
     [HttpGet]
@@ -65,6 +75,12 @@ public class ImageController : Controller
             return BadRequest(new { error = "Mô tả ảnh không được để trống." });
         }
 
+        if (!_quotaService.TryConsumeQuota(HttpContext, "image_page", out var quotaAfter, out var quotaErr))
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, new { error = quotaErr, quota = quotaAfter });
+        }
+
+        bool consumed = true;
         try
         {
             var (width, height) = IntentDispatcherService.ExtractDimensions(prompt, out var finalPrompt);
@@ -72,6 +88,8 @@ public class ImageController : Controller
 
             if (string.IsNullOrWhiteSpace(enhancedPrompt))
             {
+                _quotaService.RefundQuota(HttpContext, "image_page");
+                consumed = false;
                 return BadRequest(new { error = "Không đọc được nội dung mô tả. Hãy thử diễn đạt lại bằng một câu đầy đủ." });
             }
 
@@ -87,16 +105,19 @@ public class ImageController : Controller
                 height = actualHeight,
                 provider = "local-sdxl-turbo",
                 engine = "SDXL Turbo",
-                steps = _localImage.DefaultSteps
+                steps = _localImage.DefaultSteps,
+                quota = _quotaService.GetQuota(HttpContext)
             });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            if (consumed) _quotaService.RefundQuota(HttpContext, "image_page");
             _logger?.LogInformation("Client huỷ yêu cầu tạo ảnh Local.");
             return StatusCode(499, new { error = "Yêu cầu đã bị huỷ." });
         }
         catch (Exception ex)
         {
+            if (consumed) _quotaService.RefundQuota(HttpContext, "image_page");
             _logger?.LogError(ex, "Lỗi khi tạo ảnh Local cho prompt: {Prompt}", prompt);
             return StatusCode(503, new { error = BuildLocalErrorMessage(ex) });
         }

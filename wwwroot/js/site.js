@@ -67,28 +67,28 @@
       }));
     }
 
-    // Toggle menu khi click vào nút
-    themeToggleBtn.addEventListener('click', function (event) {
-      event.stopPropagation();
-      themeDropdown.classList.toggle('active');
-    });
-
-    // Đóng dropdown khi click ra ngoài
-    document.addEventListener('click', function (event) {
-      if (!themeDropdown.contains(event.target) && !themeToggleBtn.contains(event.target)) {
-        themeDropdown.classList.remove('active');
-      }
-    });
-
-    // Xử lý khi click vào từng option
-    themeOptions.forEach(function (option) {
-      option.addEventListener('click', function (event) {
+    // Toggle menu khi click vào nút (nếu có dropdown)
+    if (themeToggleBtn && themeDropdown) {
+      themeToggleBtn.addEventListener('click', function (event) {
         event.stopPropagation();
-        const selectedTheme = option.getAttribute('data-theme');
-        applyTheme(selectedTheme);
-        themeDropdown.classList.remove('active');
+        themeDropdown.classList.toggle('active');
       });
-    });
+
+      document.addEventListener('click', function (event) {
+        if (!themeDropdown.contains(event.target) && !themeToggleBtn.contains(event.target)) {
+          themeDropdown.classList.remove('active');
+        }
+      });
+
+      themeOptions.forEach(function (option) {
+        option.addEventListener('click', function (event) {
+          event.stopPropagation();
+          const selectedTheme = option.getAttribute('data-theme');
+          applyTheme(selectedTheme);
+          themeDropdown.classList.remove('active');
+        });
+      });
+    }
 
     const savedTheme = localStorage.getItem('cowai_theme') || 'dark';
     applyTheme(savedTheme);

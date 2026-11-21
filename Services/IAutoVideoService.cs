@@ -9,7 +9,11 @@ public interface IAutoVideoService
         string videoType, 
         string voice, 
         List<string> avatarUrls, 
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        string? sequentialSubMode = "auto",
+        string? durationPreset = "auto",
+        string? aspectRatio = "16:9",
+        string? projectTitle = null);
 
     Task<List<Scene>> ParsePlanToScenesAsync(
         int projectId, 

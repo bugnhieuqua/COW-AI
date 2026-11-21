@@ -1,16 +1,14 @@
 @{
     ViewData["Title"] = "COW.AI Studio - Nền tảng Biên tập & Sản xuất Video AI Đa Cảnh Tự Động";
+    ViewData["Description"] = "Khám phá COW.AI Studio: Nền tảng biên tập và sản xuất video AI đa cảnh tự động. Kết hợp kịch bản thông minh từ Ollama, giọng đọc biểu cảm Edge TTS và hình ảnh nghệ thuật SDXL Turbo trên GPU cục bộ.";
+    ViewData["CanonicalUrl"] = "https://cow.ai/studio/about";
 }
 
-<head>
-    <meta name="description" content="Khám phá COW.AI Studio: Nền tảng biên tập và sản xuất video AI đa cảnh tự động. Kết hợp kịch bản thông minh từ Ollama, giọng đọc biểu cảm Edge TTS và hình ảnh nghệ thuật SDXL Turbo trên GPU cục bộ." />
+@section Head {
+    <link rel="stylesheet" href="~/css/studio.css" asp-append-version="true" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://cow.ai/studio/about" />
     <meta property="og:title" content="COW.AI Studio - Nền tảng Biên tập & Sản xuất Video AI Đa Cảnh" />
-    <meta property="og:description" content="Tự động hóa toàn diện từ Kịch bản, Giọng nói đến Hình ảnh cảnh quay với bảo mật Client-side và sức mạnh GPU cục bộ." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://cow.ai/studio/about" />
-
     <!-- Schema.org Structured Data (JSON-LD) cho SEO Google -->
     <script type="application/ld+json">
     {
@@ -27,13 +25,13 @@
       },
       "featureList": [
         "Biên kịch video tự động bằng mô hình AI cục bộ Ollama",
-        "Thuyết minh giọng đọc biểu cảm cao qua Edge TTS",
+        "Thuyết minh giọng đọc biểu cảm cao qua Edge TTS, VietNeu-TTS",
         "Sinh hình ảnh cảnh quay độ phân giải cao bằng SDXL Turbo",
         "Bảo mật quyền riêng tư 100% Client-side và SQLite cục bộ"
       ]
     }
     </script>
-</head>
+}
 
 <article class="studio-about-page" itemscope itemtype="https://schema.org/SoftwareApplication">
     <!-- Hero Section -->

@@ -53,16 +53,51 @@
                     <span class="brand-title-accent">COW.AI</span> — Trợ lý AI của bạn
                 </h1>
 
-                <p class="chat-hero-subtitle">
-                    Riêng tư 100% · Phản hồi tức thì
-                </p>
+              
             </div>
             <!-- Prompt Bar Form -->
             <form id="chatPromptForm" class="prompt-form" onsubmit="return false;">
-                <input type="file" id="chatFileInput" class="hidden" accept=".txt,.md,.cs,.py,.js,.ts,.json,.sql,.html,.css" style="display:none;" />
+                <input type="file" id="chatFileInput" class="hidden" accept=".pdf,.docx,.pptx,.xlsx,.csv,.html,.htm,.epub,.ipynb,.json,.xml,.txt,.md,.cs,.py,.js,.ts,.sql,.css" style="display:none;" />
+                <input type="file" id="chatFolderInput" class="hidden" webkitdirectory directory multiple style="display:none;" />
 
                 <!-- Menu Slash Skills (Hiện tự động khi gõ / hoặc bấm nút /) -->
                 <div id="skillsPopover" class="skills-popover hidden" role="listbox" aria-label="Danh sách kỹ năng COW.AI"></div>
+
+                <!-- Popover Thư mục AI Agent -->
+                <div id="folderAgentPopover" class="folder-agent-popover hidden" role="dialog" aria-label="Chọn thư mục dự án">
+                    <div class="folder-agent-popover__header">
+                        <div class="folder-agent-popover__title-group">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                            <span>Thư mục Dự án</span>
+                        </div>
+                        <button type="button" id="btnCloseFolderPopover" class="folder-agent-close" aria-label="Đóng">✕</button>
+                    </div>
+
+                    <div class="folder-agent-popover__body">
+                        <div class="folder-agent-upload-row">
+                            <button type="button" id="btnPickNativeOsFolder" class="folder-agent-btn folder-agent-btn--primary">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                <span>Mở Explorer chọn thư mục</span>
+                            </button>
+                        </div>
+
+                        <div class="folder-agent-path-row">
+                            <input type="text" id="folderPathInput" class="folder-agent-input" placeholder="Hoặc dán đường dẫn (D:\MyProject)..." aria-label="Đường dẫn thư mục" />
+                            <button type="button" id="btnReadServerFolder" class="folder-agent-btn folder-agent-btn--accent">Mở</button>
+                        </div>
+
+                        <div id="folderAgentStatus" class="folder-agent-status hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Thư viện Prompt Mẫu cục bộ (100% LocalStorage riêng tư) -->
+                <div id="promptLibraryPopover" class="prompt-library-popover hidden" role="dialog" aria-label="Thư viện Prompt mẫu">
+                    <div class="prompt-library-popover__head">
+                        <span class="prompt-library-popover__title">Thư viện Prompt mẫu (Riêng tư)</span>
+                        <button type="button" id="btnSavePromptTemplate" class="prompt-library-save-btn" title="Lưu nội dung đang nhập thành mẫu mới">+ Lưu ô nhập</button>
+                    </div>
+                    <div id="promptLibraryList" class="prompt-library-list"></div>
+                </div>
 
                 <div class="gradient-border-box">
                     <div class="input-card">
@@ -75,6 +110,33 @@
                             <button type="button" id="btnExitTtsMode" class="tts-mode-banner__btn" title="Chuyển về Chat AI">✕ Quay lại Chat AI</button>
                         </div>
 
+                        <!-- Thanh Workspace gắn 1-1 với phiên Chat hiện tại -->
+                        <div id="activeWorkspaceBanner" class="workspace-banner hidden" role="region" aria-label="Thư mục Workspace đang gắn với đoạn chat">
+                            <div class="workspace-banner__info">
+                                <span class="workspace-banner__icon" aria-hidden="true">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                </span>
+                                <span class="workspace-banner__name" id="workspaceBannerName">Workspace</span>
+                                <span class="workspace-banner__meta" id="workspaceBannerMeta">0 tệp · Agent sẵn sàng</span>
+                            </div>
+                            <div class="workspace-banner__actions">
+                                <label class="workspace-auto-toggle" title="Tự động chạy lệnh xóa mềm / bash không cần hỏi từng bước">
+                                    <input type="checkbox" id="workspaceAutoApproveToggle" />
+                                    <span>Auto</span>
+                                </label>
+                                <button type="button" id="workspaceRebindRealBtn" class="workspace-banner__btn hidden" title="Đổi thư mục dự án">
+                                    🔗 Đổi thư mục
+                                </button>
+                                <button type="button" id="workspaceRestoreTrashBtn" class="workspace-banner__btn hidden" title="Khôi phục tệp đã chuyển vào .cowai_trash">
+                                    ↩ Hoàn tác (<span id="workspaceTrashCount">0</span>)
+                                </button>
+                                <a id="workspaceDownloadZipBtn" href="#" class="workspace-banner__btn hidden" title="Tải xuống bản sao .zip của thư mục sau khi Agent xử lý">
+                                    ⬇ .zip
+                                </a>
+                                <button type="button" id="workspaceUnbindBtn" class="workspace-banner__close" title="Gỡ liên kết thư mục khỏi đoạn chat này" aria-label="Gỡ thư mục">✕</button>
+                            </div>
+                        </div>
+
                         <!-- Vùng preview tệp đính kèm -->
                         <div id="attachmentPreviewArea" class="attachment-preview-area hidden"></div>
 
@@ -82,7 +144,7 @@
                             id="promptInput" 
                             name="prompt" 
                             rows="1" 
-                            placeholder="Hỏi bất kỳ điều gì hoặc gõ / để chọn kỹ năng (/imags, /code)..." 
+                            placeholder="Hỏi bất kỳ điều gì hoặc gõ / để chọn kỹ năng (/folder, /imags, /code)..." 
                             class="prompt-input prompt-textarea"
                             aria-label="Nhập lệnh cho AI"
                             aria-autocomplete="list"
@@ -94,11 +156,20 @@
                                 <button type="button" class="btn-attach" id="attachBtn" aria-label="Đính kèm tệp" title="Đính kèm tệp văn bản / mã nguồn">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
                                 </button>
+                                <button type="button" class="btn-attach-folder" id="attachFolderBtn" aria-label="Truy cập thư mục cho AI Agent (/folder)" title="Chọn thư mục dự án (/folder)" aria-haspopup="dialog" aria-expanded="false">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                    <span>Thư mục</span>
+                                </button>
                                 <button type="button" class="btn-skills-trigger" id="skillsTriggerBtn" aria-label="Mở danh sách kỹ năng (/)" title="Kỹ năng nhanh (/imags, /code...)" aria-haspopup="listbox" aria-expanded="false">
                                     <span class="btn-skills-trigger__slash">/</span>
                                     <span class="btn-skills-trigger__label">Skills</span>
                                 </button>
+                                <button type="button" class="btn-prompt-library" id="promptLibraryBtn" aria-label="Mở thư viện Prompt mẫu" title="Thư viện Prompt mẫu (LocalStorage)" aria-haspopup="dialog" aria-expanded="false">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                    <span>Mẫu</span>
+                                </button>
                                 <partial name="_ModelSelector" />
+                                <span id="homeImageQuotaBadge" class="home-image-quota-pill" title="Giới hạn tạo tối đa 5 ảnh tại Trang chủ + 5 ảnh tại Trang tạo ảnh (tổng 10 ảnh)">Ảnh: 0/5</span>
                             </div>
 
                             <div class="input-card-footer__right">

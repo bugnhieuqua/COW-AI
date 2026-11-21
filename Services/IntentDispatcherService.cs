@@ -150,6 +150,90 @@ public class IntentDispatcherService
         return false;
     }
 
+    /// <summary>
+    /// Nhận diện kỹ năng khởi tạo và thanh tra thư mục (/init, /scan, /inspect, /thanhtra).
+    /// </summary>
+    public bool DetectInitSkillIntent(string prompt, out string customInstructions)
+    {
+        customInstructions = string.Empty;
+        var trimmed = prompt?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(trimmed)) return false;
+
+        string[] initCommands = ["/init", "/scan", "/inspect", "/thanhtra"];
+        string? remainder = null;
+        foreach (var cmd in initCommands)
+        {
+            if (trimmed.StartsWith(cmd + " ", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith(cmd + ":", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith(cmd + "\n", StringComparison.OrdinalIgnoreCase))
+            {
+                remainder = trimmed.Substring(cmd.Length + 1).Trim();
+                break;
+            }
+            if (string.Equals(trimmed, cmd, StringComparison.OrdinalIgnoreCase))
+            {
+                remainder = string.Empty;
+                break;
+            }
+        }
+
+        if (remainder == null) return false;
+        customInstructions = remainder;
+        return true;
+    }
+
+    /// <summary>
+    /// Nhận diện kỹ năng truy cập và đọc thư mục (/folder, /dir, /repo, /thumuc).
+    /// Hỗ trợ cú pháp: `/folder D:\Path câu hỏi` hoặc `/folder "D:\My Path" câu hỏi`.
+    /// </summary>
+    public bool DetectFolderSkillIntent(string prompt, out string folderPath, out string userQuestion)
+    {
+        folderPath = string.Empty;
+        userQuestion = string.Empty;
+        var trimmed = prompt?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(trimmed)) return false;
+
+        string[] folderCommands = ["/folder", "/dir", "/repo", "/thumuc"];
+        string? remainder = null;
+        foreach (var cmd in folderCommands)
+        {
+            if (trimmed.StartsWith(cmd + " ", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith(cmd + ":", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith(cmd + "\n", StringComparison.OrdinalIgnoreCase))
+            {
+                remainder = trimmed.Substring(cmd.Length + 1).Trim();
+                break;
+            }
+            if (string.Equals(trimmed, cmd, StringComparison.OrdinalIgnoreCase))
+            {
+                remainder = string.Empty;
+                break;
+            }
+        }
+
+        if (remainder == null) return false;
+        if (string.IsNullOrWhiteSpace(remainder)) return true;
+
+        var quotedMatch = Regex.Match(remainder, "^\"([^\"]+)\"(?:\\s+([\\s\\S]*))?$");
+        if (quotedMatch.Success)
+        {
+            folderPath = quotedMatch.Groups[1].Value.Trim();
+            userQuestion = quotedMatch.Groups[2].Value.Trim();
+            return true;
+        }
+
+        var pathMatch = Regex.Match(remainder, @"^((?:[A-Za-z]:\\|\\\\|/)[^\s\r\n]+)(?:\s+([\s\S]*))?$");
+        if (pathMatch.Success)
+        {
+            folderPath = pathMatch.Groups[1].Value.Trim();
+            userQuestion = pathMatch.Groups[2].Value.Trim();
+            return true;
+        }
+
+        userQuestion = remainder;
+        return true;
+    }
+
     private static bool StripSearchSlashCommand(ref string prompt)
     {
         string[] searchCommands = ["/search", "/tim", "/web"];
@@ -207,9 +291,10 @@ public class IntentDispatcherService
             return true;
         }
 
-        // Nếu người dùng chủ động chọn DuckDuckGo Search hoặc gọi các kỹ năng khác (/code, /search, /tts), không tự động chuyển sang tạo ảnh
+        // Nếu người dùng chủ động chọn DuckDuckGo Search hoặc gọi các kỹ năng khác (/code, /search, /tts, /folder), không tự động chuyển sang tạo ảnh
         if (string.Equals(model?.Trim(), "duckduckgo", StringComparison.OrdinalIgnoreCase) ||
             DetectCodeSkillIntent(cleanPrompt, out _) ||
+            DetectFolderSkillIntent(cleanPrompt, out _, out _) ||
             StripSearchSlashCommand(ref cleanPrompt))
         {
             return false;

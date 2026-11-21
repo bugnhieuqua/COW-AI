@@ -16,3 +16,6 @@ wwwroot/media/studio/renders/
 wwwroot/media/studio/avatars/
 wwwroot/media/studio/audio/
 wwwroot/media/studio/images/
+
+# Local MCP & Repomix Node dependencies
+Tools/agent-mcp/node_modules/

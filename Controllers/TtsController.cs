@@ -9,13 +9,24 @@ public class TtsController : ControllerBase
 {
     private const int MaxTextLength = 12000;
 
-    private readonly ITtsService _ttsService;
+    private readonly IVieNeuTtsService _vieNeuTts;
     private readonly ILogger<TtsController>? _logger;
 
-    public TtsController(ITtsService ttsService, ILogger<TtsController>? logger = null)
+    public TtsController(IVieNeuTtsService vieNeuTts, ILogger<TtsController>? logger = null)
     {
-        _ttsService = ttsService;
+        _vieNeuTts = vieNeuTts;
         _logger = logger;
+    }
+
+    [HttpGet("status")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult Status([FromQuery] bool warmup = false)
+    {
+        if (warmup)
+        {
+            _vieNeuTts.TriggerWarmUp();
+        }
+        return Ok(_vieNeuTts.GetServerStatus());
     }
 
     [HttpGet("speak")]
@@ -37,31 +48,27 @@ public class TtsController : ControllerBase
 
         try
         {
-            Response.ContentType = "audio/mpeg";
+            var (success, error, audioBytes, contentType) = await _vieNeuTts.SynthesizeWavBytesAsync(text, voice ?? "Hải Đăng", cancellationToken);
+            if (!success || audioBytes.Length == 0)
+            {
+                return StatusCode(503, new
+                {
+                    error = error ?? "Server âm thanh VieNeu-TTS đang load hoặc chưa sẵn sàng. Vui lòng đợi giây lát và thử lại.",
+                    status = _vieNeuTts.GetServerStatus()
+                });
+            }
+
             Response.Headers.CacheControl = "no-cache";
-            Response.Headers["X-Accel-Buffering"] = "no";
-
-            await _ttsService.StreamToResponseAsync(text, Response.Body, voice, cancellationToken);
-
-            return new EmptyResult();
+            return File(audioBytes, contentType);
         }
         catch (OperationCanceledException)
         {
-            // Người dùng hủy phát hoặc đóng kết nối
             return new EmptyResult();
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Lỗi Edge TTS khi tạo âm thanh cho voice: {Voice}", voice ?? "default");
-
-            if (Response.HasStarted)
-            {
-                // Header/audio đã gửi đi, không thể trả JSON lỗi nữa
-                return new EmptyResult();
-            }
-
-            Response.Clear();
-            return StatusCode(500, new { error = "Không thể tạo âm thanh. Vui lòng thử lại sau." });
+            _logger?.LogError(ex, "Lỗi VieNeu-TTS khi tạo âm thanh cho voice: {Voice}", voice ?? "Hải Đăng");
+            return StatusCode(500, new { error = "Không thể tạo âm thanh VieNeu-TTS. Vui lòng thử lại sau." });
         }
     }
 }

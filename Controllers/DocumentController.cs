@@ -26,8 +26,54 @@ public class DocumentController : Controller
 
     public IActionResult CodeGen() => View();
 
+    [HttpGet("/Document/TrainedModelStatus")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> TrainedModelStatus(CancellationToken cancellationToken)
+    {
+        var (online, models) = await _ollama.GetLocalModelsAsync(cancellationToken);
+        var hasCowAi = models.Any(m => m.StartsWith("cow-ai", StringComparison.OrdinalIgnoreCase));
+        var hasCoder = models.Any(m => m.StartsWith("qwen2.5-coder", StringComparison.OrdinalIgnoreCase));
+        return Json(new
+        {
+            online,
+            hasTrainedModel = hasCowAi,
+            hasCoderModel = hasCoder,
+            defaultModel = "cow-ai-local",
+            trainedModelName = "cow-ai:latest",
+            availableModels = models
+        });
+    }
+
+    [HttpPost("/Document/ExtractFile")]
+    [RequestSizeLimit(DocumentTextExtractor.MaxBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = DocumentTextExtractor.MaxBytes)]
+    public async Task<IActionResult> ExtractFile([FromForm] IFormFile? file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { error = "Vui lòng chọn tệp tài liệu cần trích xuất." });
+        }
+        if (file.Length > DocumentTextExtractor.MaxBytes)
+        {
+            return BadRequest(new { error = "Tệp tài liệu vượt quá giới hạn 100 MB." });
+        }
+        if (!DocumentTextExtractor.IsAllowed(file.FileName))
+        {
+            return BadRequest(new { error = "Chỉ hỗ trợ định dạng .pdf, .docx, .pptx, .xlsx, .csv, .html, .epub, .ipynb, .json, .xml, .txt hoặc .md." });
+        }
+
+        var (content, warning) = await DocumentTextExtractor.ExtractAsync(file, _logger, HttpContext.RequestAborted);
+        return Ok(new
+        {
+            success = true,
+            fileName = Path.GetFileName(file.FileName),
+            content,
+            warning
+        });
+    }
+
     [HttpPost]
-    public async Task<IActionResult> StreamSummary(string content, string? length, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> StreamSummary(string content, string? length, string? model = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -36,12 +82,13 @@ public class DocumentController : Controller
 
         // Tải prompt từ file ngoài DocumentSummary.json qua PromptService
         var prompt = _promptService.GetSummaryPrompt(content, length);
+        var targetModel = string.IsNullOrWhiteSpace(model) ? "cow-ai-local" : model.Trim();
 
-        return await StreamInternal(prompt, "llama3", cancellationToken);
+        return await StreamInternal(prompt, targetModel, cancellationToken);
     }
 
     [HttpPost]
-    public async Task<IActionResult> StreamCodeGen(string prompt, string language, string? standards, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> StreamCodeGen(string prompt, string language, string? standards, string? model = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(prompt))
         {
@@ -50,8 +97,9 @@ public class DocumentController : Controller
 
         // Tải prompt từ file ngoài CodeGeneration.txt qua PromptService
         var fullPrompt = _promptService.GetCodeGenPrompt(prompt, language, standards);
+        var targetModel = string.IsNullOrWhiteSpace(model) ? "cow-ai-local" : model.Trim();
 
-        return await StreamInternal(fullPrompt, "deepseek", cancellationToken);
+        return await StreamInternal(fullPrompt, targetModel, cancellationToken);
     }
 
     private async Task<IActionResult> StreamInternal(string prompt, string model, CancellationToken cancellationToken = default)
@@ -64,9 +112,10 @@ public class DocumentController : Controller
         bool doneSent = false;
         try
         {
-            var stream = _openRouter.HasValidApiKey()
-                ? await _openRouter.StreamChatAsync(prompt, model, cancellationToken: cancellationToken)
-                : await _ollama.StreamChatAsync(prompt, "cow-ai-local", cancellationToken: cancellationToken);
+            // Ưu tiên trực tiếp model AI đã train cục bộ (cow-ai:latest, qwen2.5-coder:7b, qwen2.5:7b) khi người dùng chọn hoặc mặc định
+            var stream = (OllamaService.IsOllamaModel(model) || !_openRouter.HasValidApiKey())
+                ? await _ollama.StreamChatAsync(prompt, model, cancellationToken: cancellationToken)
+                : await _openRouter.StreamChatAsync(prompt, model, cancellationToken: cancellationToken);
 
             using var reader = new StreamReader(stream);
             string? line;

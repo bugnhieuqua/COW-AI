@@ -9,6 +9,13 @@ public record VideoRenderResult(
     string? LocalFilePath, 
     double TotalDurationSeconds);
 
+public record RenderProgressSnapshot(
+    string Step,
+    int Percent,
+    string Detail,
+    bool IsRunning,
+    DateTime UpdatedAt);
+
 public interface IVideoRenderService
 {
     Task<VideoRenderResult> RenderProjectVideoAsync(
@@ -17,6 +24,8 @@ public interface IVideoRenderService
         bool includeBgm = true,
         string renderMode = "fast",
         CancellationToken ct = default);
+
+    RenderProgressSnapshot GetRenderProgress(int projectId);
 
     bool IsFfmpegAvailable();
 }

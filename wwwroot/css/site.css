@@ -254,7 +254,7 @@ input, textarea {
 
 .main-content {
   flex: 1;
-  padding-top: 4rem;
+  padding-top: 0;
 }
 
 /* Global Utility States */

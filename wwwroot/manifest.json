@@ -1,0 +1,32 @@
+{
+  "name": "COW.AI — Trợ lý AI Đa Năng & Studio Video",
+  "short_name": "COW.AI",
+  "description": "Nền tảng trợ lý AI riêng tư 100%: Chat đa mô hình, tạo ảnh GPU cục bộ, tóm tắt tài liệu, viết code và sản xuất video bài giảng AI.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "/images/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Chat AI", "short_name": "Chat", "url": "/" },
+    { "name": "Tạo ảnh AI", "short_name": "Tạo ảnh", "url": "/Image" },
+    { "name": "Tóm tắt tài liệu", "short_name": "Tóm tắt", "url": "/Document/Summary" },
+    { "name": "Viết code AI", "short_name": "Code", "url": "/Document/CodeGen" },
+    { "name": "COW.AI Studio", "short_name": "Studio", "url": "/studio" }
+  ]
+}

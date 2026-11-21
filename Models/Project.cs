@@ -32,6 +32,11 @@ public class Project
     [MaxLength(50)]
     public string VideoType { get; set; } = "comparison"; // comparison, sequential
 
+    [MaxLength(16)]
+    public string AspectRatio { get; set; } = "16:9"; // 16:9, 9:16, 1:1
+
+    public bool IsAspectLocked { get; set; } = false; // true khi chọn 16:9 / 9:16 / 1:1 cố định; false khi chọn Bảng vẽ trống
+
     public string? AvatarsJson { get; set; } // JSON array of up to 3 avatar image paths
 
     public string? PlanMarkdown { get; set; } // Generated Markdown plan (.md)
@@ -40,6 +45,19 @@ public class Project
     public string? SourceFileName { get; set; }
 
     public string? SourceContent { get; set; }
+
+    public string? SourceMarkdown { get; set; }
+
+    [MaxLength(30)]
+    public string SequentialSubMode { get; set; } = "auto"; // auto, frame, kinetic
+
+    [MaxLength(30)]
+    public string DurationPreset { get; set; } = "auto"; // auto, short_35s, medium_2_3m, deep_4_6m
+
+    public double EstimatedDurationSeconds { get; set; } = 36.0;
+
+    [MaxLength(60)]
+    public string SkillKey { get; set; } = "compare-3zone";
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

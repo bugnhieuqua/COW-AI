@@ -16,6 +16,8 @@ public class StudioService : IStudioService
     private readonly PollinationsService _pollinations;
     private readonly IVieNeuTtsService _vieNeuTts;
     private readonly IAutoVideoService _autoVideo;
+    private readonly VideoDurationEstimator _estimator;
+    private readonly IImageCompressionService _imageCompressor;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<StudioService> _logger;
 
@@ -28,6 +30,8 @@ public class StudioService : IStudioService
         PollinationsService pollinations,
         IVieNeuTtsService vieNeuTts,
         IAutoVideoService autoVideo,
+        VideoDurationEstimator estimator,
+        IImageCompressionService imageCompressor,
         IWebHostEnvironment env,
         ILogger<StudioService> logger)
     {
@@ -39,6 +43,8 @@ public class StudioService : IStudioService
         _pollinations = pollinations;
         _vieNeuTts = vieNeuTts;
         _autoVideo = autoVideo;
+        _estimator = estimator;
+        _imageCompressor = imageCompressor;
         _env = env;
         _logger = logger;
 
@@ -68,14 +74,125 @@ public class StudioService : IStudioService
             .FirstOrDefaultAsync();
     }
 
-    public async Task<Project> CreateProjectAsync(int? userId, string title, string? description, string? voice)
+    public async Task<Project?> SaveProjectSourceAsync(
+        int projectId,
+        string? sourceFileName,
+        string? sourceContent,
+        List<string>? avatarUrls)
     {
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null) return null;
+
+        if (!string.IsNullOrWhiteSpace(sourceFileName))
+        {
+            project.SourceFileName = sourceFileName;
+            var normalizedMd = _estimator.NormalizeSourceMarkdown(sourceContent, sourceFileName);
+            project.SourceContent = normalizedMd;
+            project.SourceMarkdown = normalizedMd;
+
+            var est = _estimator.Estimate(normalizedMd, null, project.SequentialSubMode, project.DurationPreset, project.AspectRatio);
+            project.EstimatedDurationSeconds = est.TargetDurationSeconds;
+            project.VideoType = est.RecommendedVideoType;
+            project.SkillKey = AutoVideoService.ResolveSkillKey(project.VideoType, est.RecommendedSequentialSubMode, project.AspectRatio, est.WordCount);
+
+            if (string.Equals(project.Status, "Empty", StringComparison.OrdinalIgnoreCase))
+            {
+                project.Status = "Draft";
+            }
+
+            // Tự đặt tên dự án theo tệp vừa nạp
+            var baseName = Path.GetFileNameWithoutExtension(sourceFileName)?.Trim();
+            if (!string.IsNullOrWhiteSpace(baseName))
+            {
+                project.Title = baseName;
+            }
+
+            // Xóa bỏ kịch bản và phân cảnh cũ khi nạp tài liệu mới để không bị lẫn nội dung cũ
+            project.PlanMarkdown = null;
+            var oldScenes = await _db.Scenes.Where(s => s.ProjectId == projectId).ToListAsync();
+            if (oldScenes.Count > 0)
+            {
+                _db.Scenes.RemoveRange(oldScenes);
+            }
+        }
+
+        if (avatarUrls != null && avatarUrls.Count > 0)
+        {
+            var merged = ParseAvatarsJson(project.AvatarsJson);
+            foreach (var url in avatarUrls)
+            {
+                if (!string.IsNullOrWhiteSpace(url) && !merged.Contains(url, StringComparer.OrdinalIgnoreCase))
+                {
+                    merged.Add(url.Trim());
+                }
+            }
+            if (merged.Count > 6)
+            {
+                merged = merged.Take(6).ToList();
+            }
+            project.AvatarsJson = JsonSerializer.Serialize(merged);
+        }
+
+        project.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Đã lưu lịch sử tài liệu nguồn '{File}' vào CSDL cho dự án #{Id}", project.SourceFileName, projectId);
+        return project;
+    }
+
+    public async Task<List<string>?> UpdateProjectAvatarsAsync(int projectId, List<string> avatarUrls)
+    {
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null) return null;
+
+        var normalized = (avatarUrls ?? new List<string>())
+            .Where(u => !string.IsNullOrWhiteSpace(u))
+            .Select(u => u.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(6)
+            .ToList();
+
+        project.AvatarsJson = JsonSerializer.Serialize(normalized);
+        project.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return normalized;
+    }
+
+    public static List<string> ParseAvatarsJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json)
+                ?.Where(u => !string.IsNullOrWhiteSpace(u))
+                .ToList() ?? new List<string>();
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+
+    public static string NormalizeAspectRatio(string? aspectRatio)
+    {
+        return (aspectRatio ?? "16:9").Trim() switch
+        {
+            "9:16" => "9:16",
+            "1:1" => "1:1",
+            _ => "16:9"
+        };
+    }
+
+    public async Task<Project> CreateProjectAsync(int? userId, string title, string? description, string? voice, string? aspectRatio = "16:9", bool isAspectLocked = false)
+    {
+        var normalizedAspect = NormalizeAspectRatio(aspectRatio);
         var project = new Project
         {
             UserId = userId,
             Title = string.IsNullOrWhiteSpace(title) ? "Dự án Studio mới" : title.Trim(),
             Description = description?.Trim(),
             Voice = string.IsNullOrWhiteSpace(voice) ? "Hải Đăng" : voice.Trim(),
+            AspectRatio = normalizedAspect,
+            IsAspectLocked = isAspectLocked,
             Status = "Empty",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -83,8 +200,19 @@ public class StudioService : IStudioService
 
         _db.Projects.Add(project);
         await _db.SaveChangesAsync();
-        _logger.LogInformation("Đã khởi tạo dự án Studio #{Id}: {Title}", project.Id, project.Title);
+        _logger.LogInformation("Đã khởi tạo dự án Studio #{Id}: {Title} ({Aspect}, Locked={Locked})", project.Id, project.Title, project.AspectRatio, project.IsAspectLocked);
         return project;
+    }
+
+    public async Task<bool> UpdateProjectAspectRatioAsync(int projectId, string aspectRatio)
+    {
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null) return false;
+        if (project.IsAspectLocked) return true;
+        project.AspectRatio = NormalizeAspectRatio(aspectRatio);
+        project.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return true;
     }
 
     public async Task<Project?> GetProjectAsync(int projectId)
@@ -96,19 +224,22 @@ public class StudioService : IStudioService
 
     public async Task<List<Project>> GetUserProjectsAsync(int? userId)
     {
+        IQueryable<Project> query = _db.Projects.Include(p => p.Scenes);
         if (userId.HasValue)
         {
-            return await _db.Projects
-                .Where(p => p.UserId == userId.Value)
-                .OrderByDescending(p => p.UpdatedAt)
-                .ToListAsync();
+            query = query.Where(p => p.UserId == userId.Value);
+        }
+        else
+        {
+            // Với khách chưa đăng nhập, trả về các dự án không có userId (Demo)
+            query = query.Where(p => p.UserId == null);
         }
 
-        // Với khách chưa đăng nhập, trả về các dự án không có userId (Demo)
-        return await _db.Projects
-            .Where(p => p.UserId == null)
+        // Tự động loại bỏ hoàn toàn các dự án rỗng 0 cảnh và không có tệp nguồn
+        return await query
+            .Where(p => p.Scenes.Any() || !string.IsNullOrEmpty(p.SourceFileName) || !string.IsNullOrEmpty(p.SourceContent))
             .OrderByDescending(p => p.UpdatedAt)
-            .Take(10)
+            .Take(20)
             .ToListAsync();
     }
 
@@ -237,61 +368,36 @@ public class StudioService : IStudioService
         if (scene == null) return (false, "Cảnh không tồn tại.", null, 0);
 
         var voice = scene.Project?.Voice ?? "Hải Đăng";
-        var fileName = $"scene_{scene.Id}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.mp3";
-        var audioDir = Path.Combine(_env.WebRootPath, "media", "studio", "audio");
-        if (!Directory.Exists(audioDir)) Directory.CreateDirectory(audioDir);
-        var filePath = Path.Combine(audioDir, fileName);
 
         try
         {
-            bool isVieNeuVoice = voice.Equals("Hải Đăng", StringComparison.OrdinalIgnoreCase) ||
-                                 voice.Equals("Lan Nhi", StringComparison.OrdinalIgnoreCase) ||
-                                 voice.Equals("Binh", StringComparison.OrdinalIgnoreCase);
+            // Bắt buộc 100% sử dụng VieNeu-TTS 48kHz với câu đọc đã phiên âm (ttsText)
+            var spokenText = !string.IsNullOrWhiteSpace(scene.TtsText)
+                ? scene.TtsText
+                : Regex.Replace(scene.Content ?? string.Empty, @"\[/?kw\]", "", RegexOptions.IgnoreCase);
 
-            string audioUrl = string.Empty;
-            double duration = 4.0;
+            var (success, error, genUrl, dur) = await _vieNeuTts.GenerateAudioAsync(
+                spokenText,
+                voice,
+                $"proj_{scene.ProjectId}");
 
-            if (isVieNeuVoice)
+            if (!success || string.IsNullOrWhiteSpace(genUrl))
             {
-                var (success, error, genUrl, dur) = await _vieNeuTts.GenerateAudioAsync(scene.Content, voice, "studio/audio");
-                if (success && !string.IsNullOrWhiteSpace(genUrl))
-                {
-                    audioUrl = genUrl;
-                    duration = dur > 0 ? dur : 4.0;
-                }
-                else
-                {
-                    _logger.LogWarning("VieNeu-TTS không phản hồi ({Error}). Chuyển sang Edge-TTS fallback...", error);
-                    var fallbackVoice = (voice.Contains("Hải Đăng", StringComparison.OrdinalIgnoreCase) || voice.Contains("Binh", StringComparison.OrdinalIgnoreCase))
-                        ? "vi-VN-NamMinhNeural"
-                        : "vi-VN-HoaiMyNeural";
-                    using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
-                    await _tts.StreamToResponseAsync(scene.Content, fileStream, fallbackVoice);
-                    await fileStream.FlushAsync();
-                    audioUrl = $"/media/studio/audio/{fileName}";
-                    duration = await MeasureAudioDurationWithFfprobeAsync(filePath, scene.Content);
-                }
-            }
-            else
-            {
-                using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await _tts.StreamToResponseAsync(scene.Content, fileStream, voice);
-                await fileStream.FlushAsync();
-                audioUrl = $"/media/studio/audio/{fileName}";
-                duration = await MeasureAudioDurationWithFfprobeAsync(filePath, scene.Content);
+                _logger.LogWarning("VieNeu-TTS chưa tạo được audio cho Scene #{Id}: {Error}", sceneId, error);
+                return (false, error ?? "Server âm thanh VieNeu-TTS đang load hoặc chưa sẵn sàng. Vui lòng đợi giây lát.", null, 0);
             }
 
-            scene.AudioUrl = audioUrl;
-            scene.DurationSeconds = Math.Max(2.5, Math.Round(duration, 1));
+            scene.AudioUrl = genUrl;
+            scene.DurationSeconds = Math.Max(2.5, Math.Round(dur > 0 ? dur : 4.0, 1));
             await _db.SaveChangesAsync();
 
-            _logger.LogInformation("Sinh âm thanh thành công cho Scene #{Id}: {Url} ({Duration}s)", scene.Id, audioUrl, scene.DurationSeconds);
-            return (true, null, audioUrl, scene.DurationSeconds);
+            _logger.LogInformation("Sinh âm thanh VieNeu-TTS thành công cho Scene #{Id}: {Url} ({Duration}s)", scene.Id, genUrl, scene.DurationSeconds);
+            return (true, null, genUrl, scene.DurationSeconds);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Lỗi tạo audio cho Scene #{Id}", sceneId);
-            return (false, "Lỗi sinh giọng đọc: " + ex.Message, null, 0);
+            _logger.LogError(ex, "Lỗi tạo audio VieNeu-TTS cho Scene #{Id}", sceneId);
+            return (false, "Lỗi sinh giọng đọc VieNeu-TTS: " + ex.Message, null, 0);
         }
     }
 
@@ -336,16 +442,31 @@ public class StudioService : IStudioService
 
         var prompt = string.IsNullOrWhiteSpace(scene.ImagePrompt) ? scene.Content : scene.ImagePrompt;
         string? finalImageUrl = null;
+        var imageDir = Path.Combine(_env.WebRootPath, "media", "studio", "images");
+        Directory.CreateDirectory(imageDir);
 
         try
         {
-            // Thử tạo bằng Local SDXL Turbo trước
+            // 1. Thử tạo bằng Local SDXL Turbo trước rồi lưu vĩnh viễn ra đĩa (tránh mất ảnh trong RAM cache khi restart)
             try
             {
                 var (localUrl, _, _) = await _localImage.GenerateImageAsync(prompt, 768, 432);
                 if (!string.IsNullOrWhiteSpace(localUrl))
                 {
-                    finalImageUrl = localUrl;
+                    var localId = localUrl.Split('/').LastOrDefault();
+                    var cached = !string.IsNullOrWhiteSpace(localId) ? _localImage.GetCachedImage(localId) : null;
+                    if (cached != null && cached.Bytes.Length > 0)
+                    {
+                        var (_, compBytes, compExt, _) = await _imageCompressor.CompressImageBytesAsync(cached.Bytes, "sdxl.png");
+                        var diskName = $"scene_{scene.Id}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{compExt}";
+                        var diskPath = Path.Combine(imageDir, diskName);
+                        await File.WriteAllBytesAsync(diskPath, compBytes);
+                        finalImageUrl = $"/media/studio/images/{diskName}";
+                    }
+                    else
+                    {
+                        finalImageUrl = localUrl;
+                    }
                 }
             }
             catch (Exception ex)
@@ -353,10 +474,27 @@ public class StudioService : IStudioService
                 _logger.LogWarning(ex, "Local SDXL không khả dụng, chuyển sang Pollinations");
             }
 
+            // 2. Fallback qua Pollinations AI và lưu ảnh về đĩa để trình phát sân khấu & video render luôn tải được
             if (string.IsNullOrWhiteSpace(finalImageUrl))
             {
-                // Fallback tạo ảnh tức thì qua Pollinations AI
-                finalImageUrl = _pollinations.GetImageUrl(prompt, 768, 432, "flux");
+                var pollUrl = _pollinations.GetImageUrl(prompt, 768, 432, "flux");
+                try
+                {
+                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+                    var bytes = await http.GetByteArrayAsync(pollUrl);
+                    if (bytes.Length > 512)
+                    {
+                        var (_, compBytes, compExt, _) = await _imageCompressor.CompressImageBytesAsync(bytes, "poll.jpg");
+                        var diskName = $"scene_{scene.Id}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{compExt}";
+                        var diskPath = Path.Combine(imageDir, diskName);
+                        await File.WriteAllBytesAsync(diskPath, compBytes);
+                        finalImageUrl = $"/media/studio/images/{diskName}";
+                    }
+                }
+                catch
+                {
+                    finalImageUrl = pollUrl;
+                }
             }
 
             scene.ImageUrl = finalImageUrl;
@@ -367,12 +505,72 @@ public class StudioService : IStudioService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Lỗi sinh ảnh cho Scene #{Id}", sceneId);
-            // Fallback an toàn qua Pollinations URL
             var fallbackUrl = _pollinations.GetImageUrl(prompt, 768, 432, "flux");
             scene.ImageUrl = fallbackUrl;
             await _db.SaveChangesAsync();
             return (true, null, fallbackUrl);
         }
+    }
+
+    public async Task<(bool Success, string? Error, string? ImageUrl)> UploadSceneImageAsync(int sceneId, IFormFile file)
+    {
+        var scene = await _db.Scenes.FirstOrDefaultAsync(s => s.Id == sceneId);
+        if (scene == null) return (false, "Phân cảnh không tồn tại.", null);
+
+        if (file == null || file.Length == 0) return (false, "Tệp ảnh không hợp lệ.", null);
+        if (file.Length > 35 * 1024 * 1024) return (false, "Tệp ảnh vượt quá giới hạn 35 MB.", null);
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext is not (".png" or ".jpg" or ".jpeg" or ".webp" or ".gif" or ".bmp" or ".jfif"))
+        {
+            return (false, "Định dạng ảnh không được hỗ trợ (chỉ chấp nhận PNG, JPG, JPEG, WEBP, GIF, BMP, JFIF).", null);
+        }
+
+        var webRoot = !string.IsNullOrWhiteSpace(_env.WebRootPath)
+            ? _env.WebRootPath
+            : Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        var imageDir = Path.Combine(webRoot, "media", "studio", "images");
+        Directory.CreateDirectory(imageDir);
+
+        byte[] imageBytes;
+        string finalExt = ext;
+
+        try
+        {
+            await using var uploadStream = file.OpenReadStream();
+            var (compSuccess, compBytes, compExt, _) = await _imageCompressor.CompressImageAsync(uploadStream, file.FileName);
+            if (compSuccess && compBytes != null && compBytes.Length > 0)
+            {
+                imageBytes = compBytes;
+                finalExt = compExt;
+            }
+            else
+            {
+                using var rawMs = new MemoryStream();
+                await file.CopyToAsync(rawMs);
+                imageBytes = rawMs.ToArray();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Bộ nén ảnh gặp sự cố, lưu trữ trực tiếp ảnh gốc: {FileName}", file.FileName);
+            using var rawMs = new MemoryStream();
+            await file.CopyToAsync(rawMs);
+            imageBytes = rawMs.ToArray();
+        }
+
+        var fileName = $"scene_custom_{sceneId}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{finalExt}";
+        var diskPath = Path.Combine(imageDir, fileName);
+
+        await System.IO.File.WriteAllBytesAsync(diskPath, imageBytes);
+
+        var webUrl = $"/media/studio/images/{fileName}";
+        scene.ImageUrl = webUrl;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Đã tải và lưu ảnh cho cảnh #{SceneId}: {Url} (Gốc: {OrigKB:F1} KB -> Lưu: {NewKB:F1} KB)",
+            sceneId, webUrl, file.Length / 1024.0, imageBytes.Length / 1024.0);
+        return (true, null, webUrl);
     }
 
     public async Task<(bool Success, string? Error)> AutoProduceProjectAsync(int projectId)
@@ -491,191 +689,74 @@ public class StudioService : IStudioService
         return true;
     }
 
+    public async Task<(bool Success, string? Error, List<Scene> Scenes)> MoveSceneAsync(int sceneId, string direction)
+    {
+        var target = await _db.Scenes.FindAsync(sceneId);
+        if (target == null) return (false, "Không tìm thấy phân cảnh.", new List<Scene>());
+
+        var scenes = await _db.Scenes
+            .Where(s => s.ProjectId == target.ProjectId)
+            .OrderBy(s => s.OrderIndex)
+            .ThenBy(s => s.Id)
+            .ToListAsync();
+
+        int idx = scenes.FindIndex(s => s.Id == sceneId);
+        int swapIdx = string.Equals(direction, "up", StringComparison.OrdinalIgnoreCase) ? idx - 1 : idx + 1;
+        if (idx < 0 || swapIdx < 0 || swapIdx >= scenes.Count)
+        {
+            return (true, null, scenes);
+        }
+
+        (scenes[idx], scenes[swapIdx]) = (scenes[swapIdx], scenes[idx]);
+        for (int i = 0; i < scenes.Count; i++) scenes[i].OrderIndex = i + 1;
+        await _db.SaveChangesAsync();
+        return (true, null, scenes);
+    }
+
+    public async Task<(bool Success, string? Error, Scene? Scene, List<Scene> Scenes)> DuplicateSceneAsync(int sceneId)
+    {
+        var source = await _db.Scenes.FindAsync(sceneId);
+        if (source == null) return (false, "Không tìm thấy phân cảnh để nhân bản.", null, new List<Scene>());
+
+        var scenes = await _db.Scenes
+            .Where(s => s.ProjectId == source.ProjectId)
+            .OrderBy(s => s.OrderIndex)
+            .ThenBy(s => s.Id)
+            .ToListAsync();
+
+        var clone = new Scene
+        {
+            ProjectId = source.ProjectId,
+            OrderIndex = source.OrderIndex + 1,
+            Title = $"{source.Title} (Bản sao)",
+            Content = source.Content,
+            ImagePrompt = source.ImagePrompt,
+            ImageUrl = source.ImageUrl,
+            AudioUrl = source.AudioUrl,
+            DurationSeconds = source.DurationSeconds,
+            AnimationEffect = source.AnimationEffect,
+            FilterPreset = source.FilterPreset,
+            SubtitlePosition = source.SubtitlePosition,
+            SceneType = source.SceneType,
+            AvatarPosition = source.AvatarPosition,
+            Speaker = source.Speaker
+        };
+
+        int insertAt = Math.Min(scenes.Count, scenes.FindIndex(s => s.Id == sceneId) + 1);
+        scenes.Insert(insertAt, clone);
+        _db.Scenes.Add(clone);
+        for (int i = 0; i < scenes.Count; i++) scenes[i].OrderIndex = i + 1;
+
+        await _db.SaveChangesAsync();
+        return (true, null, clone, scenes);
+    }
+
     public async Task<(bool Success, string? Error, string HtmlComposition)> GenerateCompositionAsync(int projectId)
     {
         var project = await _db.Projects.Include(p => p.Scenes.OrderBy(s => s.OrderIndex)).FirstOrDefaultAsync(p => p.Id == projectId);
         if (project == null) return (false, "Không tìm thấy dự án.", string.Empty);
 
-        var scenesJson = JsonSerializer.Serialize(project.Scenes.Select(s => new
-        {
-            id = s.Id,
-            orderIndex = s.OrderIndex,
-            title = s.Title,
-            content = s.Content,
-            imageUrl = s.ImageUrl ?? "/images/cyber-cow.png",
-            audioUrl = s.AudioUrl ?? "",
-            duration = s.DurationSeconds,
-            animation = s.AnimationEffect,
-            filter = s.FilterPreset,
-            subtitlePos = s.SubtitlePosition
-        }));
-
-        var totalDuration = project.Scenes.Sum(s => s.DurationSeconds);
-
-        var compositionHtml = $@"<!DOCTYPE html>
-<html lang=""vi"">
-<head>
-    <meta charset=""UTF-8"">
-    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
-    <title>{System.Net.WebUtility.HtmlEncode(project.Title)} - HyperFrames Composition</title>
-    <script src=""https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js""></script>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ background: #0b0f19; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }}
-        #hyperframes-stage {{ width: 100vw; max-width: 1280px; aspect-ratio: 16/9; position: relative; overflow: hidden; background: #000; box-shadow: 0 20px 50px rgba(0,0,0,0.8); border-radius: 8px; }}
-        .hf-scene {{ position: absolute; inset: 0; opacity: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 40px; transition: opacity 0.5s ease; }}
-        .hf-scene.active {{ opacity: 1; }}
-        .hf-bg {{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; transform-origin: center center; }}
-        .hf-overlay {{ position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.8) 100%); z-index: 2; pointer-events: none; }}
-        .hf-caption {{ position: relative; z-index: 3; max-width: 85%; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); padding: 16px 24px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-size: 20px; line-height: 1.5; text-align: center; font-weight: 500; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }}
-        .hf-caption.top {{ margin-bottom: auto; margin-top: 40px; }}
-        .hf-caption.middle {{ margin: auto 0; }}
-        .hf-caption.bottom {{ margin-top: auto; margin-bottom: 20px; }}
-        /* Filter Presets */
-        .filter-cinematic {{ filter: contrast(1.15) brightness(0.95) saturate(1.25); }}
-        .filter-warm {{ filter: sepia(0.25) saturate(1.3) brightness(1.02); }}
-        .filter-cool {{ filter: hue-rotate(185deg) saturate(1.1) brightness(0.95); }}
-        .filter-noir {{ filter: grayscale(1) contrast(1.4) brightness(0.9); }}
-        .filter-none {{ filter: none; }}
-        /* Transport Controls */
-        #hf-controls {{ position: absolute; bottom: 10px; left: 10px; right: 10px; z-index: 10; display: flex; align-items: center; gap: 12px; background: rgba(11,15,25,0.85); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }}
-        #hf-play-btn {{ background: #38bdf8; border: none; color: #0b0f19; font-weight: 700; padding: 6px 14px; border-radius: 4px; cursor: pointer; }}
-        #hf-progress {{ flex: 1; height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; cursor: pointer; position: relative; }}
-        #hf-bar {{ height: 100%; width: 0%; background: #38bdf8; border-radius: 3px; }}
-        #hf-time {{ font-size: 12px; font-variant-numeric: tabular-nums; opacity: 0.8; }}
-    </style>
-</head>
-<body>
-    <div id=""hyperframes-stage"">
-        <div id=""scenes-container""></div>
-        <div id=""hf-controls"">
-            <button id=""hf-play-btn"">Phát</button>
-            <div id=""hf-progress""><div id=""hf-bar""></div></div>
-            <div id=""hf-time"">00:00 / 00:00</div>
-        </div>
-    </div>
-    <script>
-        const scenes = {scenesJson};
-        const totalDuration = {totalDuration.ToString(System.Globalization.CultureInfo.InvariantCulture)};
-        const container = document.getElementById('scenes-container');
-        const playBtn = document.getElementById('hf-play-btn');
-        const progressBar = document.getElementById('hf-bar');
-        const progressTrack = document.getElementById('hf-progress');
-        const timeDisplay = document.getElementById('hf-time');
-
-        let currentIndex = 0;
-        let isPlaying = false;
-        let currentAudio = null;
-        let sceneTimer = null;
-
-        scenes.forEach((s, idx) => {{
-            const div = document.createElement('div');
-            div.className = 'hf-scene' + (idx === 0 ? ' active' : '');
-            div.id = 'hf-scene-' + idx;
-            
-            const img = document.createElement('img');
-            img.className = 'hf-bg filter-' + (s.filter || 'none');
-            img.src = s.imageUrl;
-            
-            const overlay = document.createElement('div');
-            overlay.className = 'hf-overlay';
-            
-            const cap = document.createElement('div');
-            cap.className = 'hf-caption ' + (s.subtitlePos || 'bottom');
-            cap.textContent = s.content;
-            
-            div.appendChild(img);
-            div.appendChild(overlay);
-            div.appendChild(cap);
-            container.appendChild(div);
-        }});
-
-        function updateTimeText(current, total) {{
-            const fmt = (sec) => {{
-                const m = Math.floor(sec / 60).toString().padStart(2, '0');
-                const s = Math.floor(sec % 60).toString().padStart(2, '0');
-                return `${{m}}:${{s}}`;
-            }};
-            timeDisplay.textContent = `${{fmt(current)}} / ${{fmt(total)}}`;
-        }}
-
-        function animateScene(idx) {{
-            const el = document.getElementById('hf-scene-' + idx);
-            if (!el) return;
-            const img = el.querySelector('.hf-bg');
-            const cap = el.querySelector('.hf-caption');
-            const s = scenes[idx];
-
-            gsap.killTweensOf([img, cap]);
-            gsap.fromTo(cap, {{ opacity: 0, y: 15 }}, {{ opacity: 1, y: 0, duration: 0.6, ease: 'power2.out' }});
-
-            const dur = s.duration || 4.0;
-            switch (s.animation) {{
-                case 'zoom-in':
-                    gsap.fromTo(img, {{ scale: 1 }}, {{ scale: 1.15, duration: dur, ease: 'none' }});
-                    break;
-                case 'pan-left':
-                    gsap.fromTo(img, {{ x: '5%', scale: 1.08 }}, {{ x: '-5%', duration: dur, ease: 'none' }});
-                    break;
-                case 'fade-scale':
-                    gsap.fromTo(img, {{ scale: 1.1, opacity: 0.85 }}, {{ scale: 1, opacity: 1, duration: dur, ease: 'power1.out' }});
-                    break;
-                case 'ken-burns':
-                default:
-                    gsap.fromTo(img, {{ scale: 1, x: '-2%', y: '-2%' }}, {{ scale: 1.12, x: '2%', y: '2%', duration: dur, ease: 'sine.inOut' }});
-                    break;
-            }}
-        }}
-
-        function playScene(idx) {{
-            if (idx >= scenes.length) {{
-                isPlaying = false;
-                playBtn.textContent = 'Phát lại';
-                currentIndex = 0;
-                return;
-            }}
-
-            currentIndex = idx;
-            document.querySelectorAll('.hf-scene').forEach((el, i) => {{
-                el.classList.toggle('active', i === idx);
-            }});
-
-            const s = scenes[idx];
-            animateScene(idx);
-
-            if (currentAudio) {{
-                currentAudio.pause();
-                currentAudio = null;
-            }}
-
-            if (s.audioUrl) {{
-                currentAudio = new Audio(s.audioUrl);
-                currentAudio.play().catch(() => {{}});
-            }}
-
-            const durMs = (s.duration || 4.0) * 1000;
-            clearTimeout(sceneTimer);
-            sceneTimer = setTimeout(() => {{
-                if (isPlaying) playScene(idx + 1);
-            }}, durMs);
-        }}
-
-        playBtn.addEventListener('click', () => {{
-            if (isPlaying) {{
-                isPlaying = false;
-                playBtn.textContent = 'Phát';
-                if (currentAudio) currentAudio.pause();
-                clearTimeout(sceneTimer);
-            }} else {{
-                isPlaying = true;
-                playBtn.textContent = 'Tạm dừng';
-                playScene(currentIndex);
-            }}
-        }});
-    </script>
-</body>
-</html>";
-
+        var compositionHtml = await _autoVideo.BuildHyperFramesCompositionAsync(project, project.Scenes);
         return (true, null, compositionHtml);
     }
 
@@ -737,17 +818,41 @@ public class StudioService : IStudioService
         string sourceContent, 
         string videoType, 
         string voice, 
-        List<string> avatarUrls)
+        List<string> avatarUrls,
+        string? sequentialSubMode = "auto",
+        string? durationPreset = "auto")
     {
         var project = await _db.Projects.FindAsync(projectId);
         if (project == null) return (false, "Không tìm thấy dự án.", string.Empty);
 
+        var effectiveSource = string.IsNullOrWhiteSpace(sourceContent)
+            ? (project.SourceMarkdown ?? project.SourceContent ?? string.Empty)
+            : sourceContent;
+
+        var normalizedMd = _estimator.NormalizeSourceMarkdown(effectiveSource, project.SourceFileName ?? project.Title);
         project.VideoType = string.IsNullOrWhiteSpace(videoType) ? "comparison" : videoType.Trim();
+        project.SequentialSubMode = string.IsNullOrWhiteSpace(sequentialSubMode) ? "auto" : sequentialSubMode.Trim();
+        project.DurationPreset = string.IsNullOrWhiteSpace(durationPreset) ? "auto" : durationPreset.Trim();
         if (!string.IsNullOrWhiteSpace(voice)) project.Voice = voice.Trim();
         project.AvatarsJson = JsonSerializer.Serialize(avatarUrls);
-        project.SourceContent = sourceContent;
+        project.SourceContent = normalizedMd;
+        project.SourceMarkdown = normalizedMd;
 
-        var markdown = await _autoVideo.GenerateMarkdownPlanAsync(sourceContent, project.VideoType, project.Voice, avatarUrls);
+        var est = _estimator.Estimate(normalizedMd, project.VideoType, project.SequentialSubMode, project.DurationPreset, project.AspectRatio);
+        project.EstimatedDurationSeconds = est.TargetDurationSeconds;
+        project.SkillKey = AutoVideoService.ResolveSkillKey(project.VideoType, est.RecommendedSequentialSubMode, project.AspectRatio, est.WordCount);
+
+        var markdown = await _autoVideo.GenerateMarkdownPlanAsync(
+            normalizedMd,
+            project.VideoType,
+            project.Voice,
+            avatarUrls,
+            default,
+            project.SequentialSubMode,
+            project.DurationPreset,
+            project.AspectRatio,
+            project.Title);
+
         project.PlanMarkdown = markdown;
         project.Status = "Reviewing";
         project.UpdatedAt = DateTime.UtcNow;

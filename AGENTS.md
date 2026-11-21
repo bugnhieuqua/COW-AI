@@ -122,6 +122,7 @@ D:\COW-AI/
 
 | Tình huống tác vụ | Lệnh / Hành động khuyến nghị |
 | :--- | :--- |
+| Đang viết kế hoạch (`/plan`) và có câu hỏi hoặc phương án đề xuất | **Bắt buộc** gọi công cụ `ask_question` để mở **Form đề xuất tương tác** cho người dùng kiểm duyệt trực tiếp (theo skill `plan-proposal-form`). |
 | Thiết kế màn hình mới hoặc luồng tương tác mới | Mở `ux-psych-design` chạy **Phase 1 (DISCOVER)** & **Phase 2 (FLOW)**, xác định 3 Taste Dials. |
 | Kiểm tra lại định hướng sản phẩm & bối cảnh người dùng | Đọc file [PRODUCT.md](PRODUCT.md) do `impeccable init` tạo. |
 | Đồng bộ hệ thống token & trích xuất phong cách | Chạy `/impeccable document` để cập nhật `DESIGN.md`. |
