@@ -1,21 +1,75 @@
-# Secrets & Local Environment
+# ====================================================================
+# SECRETS, CREDENTIALS & LOCAL CONFIGURATION
+# ====================================================================
 Key.env
 .env
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
 
-# Build outputs, Python cache & Local Databases
-bin/
-obj/
-**/__pycache__/
-*.pyc
+# ====================================================================
+# RUNTIME DATA, WORKSPACES, LOGS & CACHES
+# ====================================================================
+App_Data/
+logs/
+*.log
+*.sqlite
 Data/*.db
 Data/*.db-shm
 Data/*.db-wal
 
-# Generated Studio Render Outputs
+# ====================================================================
+# PERSONAL DOCUMENTS & SENSITIVE OFFICE FILES
+# ====================================================================
+*.pptx
+Slide_*.pptx
+Plan/*.docx
+Plan/*.pptx
+
+# ====================================================================
+# GENERATED STUDIO MEDIA & RENDER OUTPUTS
+# ====================================================================
+wwwroot/media/
+wwwroot/media/studio/projects/
 wwwroot/media/studio/renders/
 wwwroot/media/studio/avatars/
 wwwroot/media/studio/audio/
 wwwroot/media/studio/images/
 
-# Local MCP & Repomix Node dependencies
+# ====================================================================
+# EXECUTABLE BINARIES, HEAVY ASSETS & ARCHIVES
+# ====================================================================
+*.exe
+*.dll
+*.zip
+*.7z
+*.tar.gz
+.agent/skills/*/scripts/bin/
+.agent/skills/skills.zip
+.codex
+
+# ====================================================================
+# BUILD OUTPUTS & CACHE
+# ====================================================================
+bin/
+obj/
+**/__pycache__/
+*.pyc
+
+# ====================================================================
+# IDE, OS & EDITOR METADATA
+# ====================================================================
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+Thumbs.db
+Desktop.ini
+
+# ====================================================================
+# NODE & PACKAGE DEPENDENCIES
+# ====================================================================
+node_modules/
+**/node_modules/
 Tools/agent-mcp/node_modules/

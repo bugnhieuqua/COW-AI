@@ -1,7 +1,0 @@
-{"cursor":0,"bookmark":{"seq":0,"timestamp":1795160212835},"event":{"tools":["fs_list","fs_read","fs_edit","fs_rm","bash_run","todo_read","todo_write"],"timestamp":1795160212835,"channel":"monitor","type":"tool_manual_updated","bookmark":{"seq":0,"timestamp":1795160212835}}}
-{"cursor":1,"bookmark":{"seq":1,"timestamp":1795160212888},"event":{"state":"working","channel":"monitor","type":"state_changed","bookmark":{"seq":1,"timestamp":1795160212888}}}
-{"cursor":2,"bookmark":{"seq":2,"timestamp":1795160212943},"event":{"previous":"ready","current":"preModel","timestamp":1795160212943,"channel":"monitor","type":"breakpoint_changed","bookmark":{"seq":2,"timestamp":1795160212943}}}
-{"cursor":3,"bookmark":{"seq":3,"timestamp":1795160212950},"event":{"previous":"preModel","current":"streamingModel","timestamp":1795160212950,"channel":"monitor","type":"breakpoint_changed","bookmark":{"seq":3,"timestamp":1795160212950}}}
-{"cursor":7,"bookmark":{"seq":7,"timestamp":1795160216408},"event":{"previous":"streamingModel","current":"ready","timestamp":1795160216408,"channel":"monitor","type":"breakpoint_changed","bookmark":{"seq":7,"timestamp":1795160216408}}}
-{"cursor":9,"bookmark":{"seq":9,"timestamp":1795160216416},"event":{"step":1,"durationMs":3519,"channel":"monitor","type":"step_complete","bookmark":{"seq":9,"timestamp":1795160216416}}}
-{"cursor":10,"bookmark":{"seq":10,"timestamp":1795160216422},"event":{"state":"ready","channel":"monitor","type":"state_changed","bookmark":{"seq":10,"timestamp":1795160216422}}}

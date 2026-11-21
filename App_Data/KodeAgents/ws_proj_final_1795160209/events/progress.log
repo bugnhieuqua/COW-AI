@@ -1,4 +1,0 @@
-{"cursor":4,"bookmark":{"seq":4,"timestamp":1795160216381},"event":{"step":0,"channel":"progress","type":"text_chunk_start","bookmark":{"seq":4,"timestamp":1795160216381}}}
-{"cursor":5,"bookmark":{"seq":5,"timestamp":1795160216383},"event":{"step":0,"delta":"B\u1EA1n c\u00F3 mu\u1ED1n ti\u1EBFp t\u1EE5c kh\u00F4ng?","channel":"progress","type":"text_chunk","bookmark":{"seq":5,"timestamp":1795160216383}}}
-{"cursor":6,"bookmark":{"seq":6,"timestamp":1795160216396},"event":{"step":0,"text":"B\u1EA1n c\u00F3 mu\u1ED1n ti\u1EBFp t\u1EE5c kh\u00F4ng?","channel":"progress","type":"text_chunk_end","bookmark":{"seq":6,"timestamp":1795160216396}}}
-{"cursor":8,"bookmark":{"seq":8,"timestamp":1795160216410},"event":{"step":0,"reason":"completed","channel":"progress","type":"done","bookmark":{"seq":8,"timestamp":1795160216410}}}
